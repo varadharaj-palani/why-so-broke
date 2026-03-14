@@ -1,0 +1,28 @@
+version: "3.8"
+# Development overrides — use with:
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  backend:
+    volumes:
+      - ./backend:/code   # Full mount for hot reload + alembic access
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-tracker}:${DB_PASSWORD:-tracker_dev}@db:5432/why_so_broke
+      DATABASE_SYNC_URL: postgresql+psycopg2://${DB_USER:-tracker}:${DB_PASSWORD:-tracker_dev}@db:5432/why_so_broke
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-prod}
+      LLM_PROVIDER: ${LLM_PROVIDER:-claude}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules   # Prevent host node_modules from overriding container's
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
