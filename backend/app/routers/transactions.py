@@ -109,8 +109,12 @@ async def create_transaction(
         await db.flush()
         await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx1.id)
         await db.commit()
-        await db.refresh(tx1)
-        return tx1
+        result = await db.execute(
+            select(Transaction)
+            .options(selectinload(Transaction.bank), selectinload(Transaction.transfer_to_bank))
+            .where(Transaction.id == tx1.id)
+        )
+        return result.scalar_one()
     else:
         tx = Transaction(
             user_id=current_user.id, date=body.date, type=body.type,
@@ -122,8 +126,12 @@ async def create_transaction(
         await db.flush()
         await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx.id)
         await db.commit()
-        await db.refresh(tx)
-        return tx
+        result = await db.execute(
+            select(Transaction)
+            .options(selectinload(Transaction.bank), selectinload(Transaction.transfer_to_bank))
+            .where(Transaction.id == tx.id)
+        )
+        return result.scalar_one()
 
 
 @router.put("/{transaction_id}", response_model=TransactionOut)
