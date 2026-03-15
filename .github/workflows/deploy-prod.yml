@@ -40,7 +40,7 @@ jobs:
         run: |
           curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
           export PATH="$HOME/.koyeb/bin:$PATH"
-          koyeb service redeploy why-so-broke/backend
+          koyeb service redeploy evident-rycca/why-so-broke-backend
         env:
           KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
 
