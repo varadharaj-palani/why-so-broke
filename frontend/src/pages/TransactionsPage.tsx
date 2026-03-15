@@ -22,7 +22,13 @@ function TransactionForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
     setSaving(true)
     setError('')
     try {
-      await transactionsApi.create(form as Parameters<typeof transactionsApi.create>[0])
+      const payload = {
+        ...form,
+        bank_id: form.bank_id || null,
+        transfer_to_bank_id: form.transfer_to_bank_id || null,
+        notes: form.notes || null,
+      }
+      await transactionsApi.create(payload as Parameters<typeof transactionsApi.create>[0])
       onSaved()
       onClose()
     } catch (err: unknown) {
