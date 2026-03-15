@@ -37,12 +37,12 @@ jobs:
             alembic upgrade head
 
       - name: Deploy to Koyeb (prod backend)
-        uses: koyeb/action-git-deploy@v1
-        with:
-          api-token: ${{ secrets.KOYEB_API_TOKEN }}
-          app-name: why-so-broke
-          service-name: backend
-          docker: ghcr.io/${{ github.repository_owner }}/why-so-broke-backend:latest
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
+          export PATH="$HOME/.koyeb/bin:$PATH"
+          koyeb service redeploy why-so-broke/backend
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
