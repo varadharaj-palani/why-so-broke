@@ -214,47 +214,60 @@ export default function SettingsPage() {
       </div>
 
       {/* Banks */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
         <h3 className="text-sm font-semibold text-gray-800 mb-0.5">Manage Banks</h3>
-        <p className="text-xs text-gray-500 mb-3">Add and manage your bank accounts.</p>
-        <div className="divide-y divide-gray-100 mb-4">
+        <p className="text-xs text-gray-500 mb-4">Add and manage your bank accounts.</p>
+        <div className="divide-y divide-gray-100 mb-5">
           {banks.length === 0 && (
             <p className="text-sm text-gray-400 italic py-2">No banks added yet.</p>
           )}
           {banks.map(bank => (
-            <div key={bank.id} className="py-3 flex items-center gap-3">
+            <div key={bank.id} className="py-3 flex items-center justify-between gap-3">
               {editBankId === bank.id ? (
                 <>
                   <input type="text" value={editBankName} onChange={e => setEditBankName(e.target.value)} className={`flex-1 ${inlineCls}`} />
                   <input type="text" value={editBankCode} onChange={e => setEditBankCode(e.target.value)} className={`w-20 ${inlineCls}`} placeholder="Code" />
-                  <button onClick={() => saveEditBank(bank.id)} className="p-2 text-green-600 hover:bg-green-50 rounded"><CheckIcon className="w-4 h-4" /></button>
-                  <button onClick={() => setEditBankId(null)} className="p-2 text-gray-400 hover:bg-gray-50 rounded"><XMarkIcon className="w-4 h-4" /></button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => saveEditBank(bank.id)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg"><CheckIcon className="w-4 h-4" /></button>
+                    <button onClick={() => setEditBankId(null)} className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg"><XMarkIcon className="w-4 h-4" /></button>
+                  </div>
                 </>
               ) : (
                 <>
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${bank.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${bank.is_active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>{bank.name}</p>
-                    {bank.short_code && <p className="text-xs text-gray-400">{bank.short_code}</p>}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${bank.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <div className="min-w-0">
+                      <p className={`text-sm font-medium truncate ${bank.is_active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>{bank.name}</p>
+                      {bank.short_code && <p className="text-xs text-gray-400">{bank.short_code}</p>}
+                    </div>
                   </div>
-                  <button
-                    onClick={() => { setEditBankId(bank.id); setEditBankName(bank.name); setEditBankCode(bank.short_code || '') }}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-                  >
-                    <PencilIcon className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => toggleBank(bank)} className={`text-xs px-2 py-1 rounded ${bank.is_active ? 'text-red-500 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}>
-                    {bank.is_active ? 'Deactivate' : 'Activate'}
-                  </button>
-                  <button onClick={() => setConfirmDelete({ type: 'bank', id: bank.id, name: bank.name })} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
-                    <TrashIcon className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => { setEditBankId(bank.id); setEditBankName(bank.name); setEditBankCode(bank.short_code || '') }}
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                    >
+                      <PencilIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => toggleBank(bank)}
+                      className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                        bank.is_active
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                          : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                      }`}
+                    >
+                      {bank.is_active ? 'Active' : 'Inactive'}
+                    </button>
+                    <button onClick={() => setConfirmDelete({ type: 'bank', id: bank.id, name: bank.name })} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                      <TrashIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </>
               )}
             </div>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 pt-4 border-t border-gray-100">
           <input type="text" value={newBankName} onChange={e => setNewBankName(e.target.value)} placeholder="Bank name" className={`flex-1 ${cls}`} onKeyDown={e => { if (e.key === 'Enter') addBank() }} />
           <input type="text" value={newBankCode} onChange={e => setNewBankCode(e.target.value)} placeholder="Code" className={`w-20 ${cls}`} />
           <button onClick={addBank} className="bg-green-600 text-white rounded-lg px-3 py-2 hover:bg-green-700">
@@ -264,15 +277,15 @@ export default function SettingsPage() {
       </div>
 
       {/* Categories */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
         <h3 className="text-sm font-semibold text-gray-800 mb-0.5">Categories</h3>
-        <p className="text-xs text-gray-500 mb-3">Customize the categories used for your transactions.</p>
-        <div className="flex flex-wrap gap-2 mb-4">
+        <p className="text-xs text-gray-500 mb-4">Customize the categories used for your transactions.</p>
+        <div className="flex flex-wrap gap-2 mb-5">
           {categories.length === 0 && (
             <p className="text-sm text-gray-400 italic py-2">No categories yet — add one below.</p>
           )}
           {categories.map(cat => (
-            <div key={cat.id} className="group relative flex items-center gap-1 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-full px-3 py-1">
+            <div key={cat.id} className="group relative flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-full px-3 py-1.5">
               {editCategoryId === cat.id ? (
                 <>
                   <input
@@ -288,15 +301,15 @@ export default function SettingsPage() {
                 </>
               ) : (
                 <>
-                  <span className="text-xs font-medium">{cat.name}</span>
-                  <button onClick={() => { setEditCategoryId(cat.id); setEditCategoryName(cat.name) }} className="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-400 hover:text-blue-600 ml-1"><PencilIcon className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setConfirmDelete({ type: 'category', id: cat.id, name: cat.name })} className="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-400 hover:text-red-600"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                  <span className="text-xs font-semibold">{cat.name}</span>
+                  <button onClick={() => { setEditCategoryId(cat.id); setEditCategoryName(cat.name) }} className="opacity-30 group-hover:opacity-100 transition-opacity text-indigo-500 hover:text-blue-600"><PencilIcon className="w-3 h-3" /></button>
+                  <button onClick={() => setConfirmDelete({ type: 'category', id: cat.id, name: cat.name })} className="opacity-30 group-hover:opacity-100 transition-opacity text-indigo-500 hover:text-red-600"><XMarkIcon className="w-3 h-3" /></button>
                 </>
               )}
             </div>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 pt-4 border-t border-gray-100">
           <input
             type="text"
             value={newCategoryName}
@@ -312,15 +325,15 @@ export default function SettingsPage() {
       </div>
 
       {/* Payment Modes */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
         <h3 className="text-sm font-semibold text-gray-800 mb-0.5">Payment Modes</h3>
-        <p className="text-xs text-gray-500 mb-3">Manage payment methods like cash, UPI, card, etc.</p>
-        <div className="flex flex-wrap gap-2 mb-4">
+        <p className="text-xs text-gray-500 mb-4">Manage payment methods like cash, UPI, card, etc.</p>
+        <div className="flex flex-wrap gap-2 mb-5">
           {modes.length === 0 && (
             <p className="text-sm text-gray-400 italic py-2">No payment modes yet — add one below.</p>
           )}
           {modes.map(mode => (
-            <div key={mode.id} className="group relative flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-full px-3 py-1">
+            <div key={mode.id} className="group relative flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full px-3 py-1.5">
               {editModeId === mode.id ? (
                 <>
                   <input
@@ -336,15 +349,15 @@ export default function SettingsPage() {
                 </>
               ) : (
                 <>
-                  <span className="text-xs font-medium">{mode.name}</span>
-                  <button onClick={() => { setEditModeId(mode.id); setEditModeName(mode.name) }} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-400 hover:text-blue-600 ml-1"><PencilIcon className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setConfirmDelete({ type: 'mode', id: mode.id, name: mode.name })} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-400 hover:text-red-600"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                  <span className="text-xs font-semibold">{mode.name}</span>
+                  <button onClick={() => { setEditModeId(mode.id); setEditModeName(mode.name) }} className="opacity-30 group-hover:opacity-100 transition-opacity text-amber-500 hover:text-blue-600"><PencilIcon className="w-3 h-3" /></button>
+                  <button onClick={() => setConfirmDelete({ type: 'mode', id: mode.id, name: mode.name })} className="opacity-30 group-hover:opacity-100 transition-opacity text-amber-500 hover:text-red-600"><XMarkIcon className="w-3 h-3" /></button>
                 </>
               )}
             </div>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 pt-4 border-t border-gray-100">
           <input
             type="text"
             value={newModeName}
