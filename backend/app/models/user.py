@@ -20,3 +20,5 @@ class User(Base):
     budgets: Mapped[list["Budget"]] = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     activity_logs: Mapped[list["ActivityLog"]] = relationship("ActivityLog", back_populates="user", cascade="all, delete-orphan")
     import_jobs: Mapped[list["ImportJob"]] = relationship("ImportJob", back_populates="user", cascade="all, delete-orphan")
+    categories: Mapped[list["Category"]] = relationship("Category", back_populates="user", cascade="all, delete-orphan")
+    modes: Mapped[list["Mode"]] = relationship("Mode", back_populates="user", cascade="all, delete-orphan")

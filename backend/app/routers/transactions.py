@@ -10,6 +10,8 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
 from app.models.transaction import Transaction
+from app.models.category import Category
+from app.models.mode import Mode
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionOut, TransactionListResponse
 from app.services import activity_service
 
@@ -35,6 +37,22 @@ def build_filter(current_user: User, **kwargs):
     if kwargs.get("type"):
         conditions.append(Transaction.type == kwargs["type"])
     return conditions
+
+
+async def _validate_category(db: AsyncSession, user_id: uuid.UUID, category: str) -> None:
+    result = await db.execute(
+        select(Category).where(Category.user_id == user_id, Category.name == category)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=422, detail=f"Invalid category: {category}")
+
+
+async def _validate_mode(db: AsyncSession, user_id: uuid.UUID, mode: str) -> None:
+    result = await db.execute(
+        select(Mode).where(Mode.user_id == user_id, Mode.name == mode)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=422, detail=f"Invalid mode: {mode}")
 
 
 @router.get("", response_model=TransactionListResponse)
@@ -76,7 +94,7 @@ async def list_transactions(
         items=items,
         total=total,
         page=page,
-        pages=-(-total // per_page),  # ceiling division
+        pages=-(-total // per_page),
     )
 
 
@@ -86,6 +104,9 @@ async def create_transaction(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    await _validate_category(db, current_user.id, body.category)
+    await _validate_mode(db, current_user.id, body.mode)
+
     if body.type == "transfer":
         if not body.transfer_to_bank_id:
             raise HTTPException(status_code=400, detail="transfer_to_bank_id required for transfers")
@@ -152,6 +173,11 @@ async def update_transaction(
     if tx.type == "transfer":
         raise HTTPException(status_code=400, detail="Cannot edit transfer transactions directly. Delete and recreate.")
 
+    if body.category is not None:
+        await _validate_category(db, current_user.id, body.category)
+    if body.mode is not None:
+        await _validate_mode(db, current_user.id, body.mode)
+
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(tx, field, value)
 
@@ -174,7 +200,6 @@ async def delete_transaction(
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     if tx.transfer_group_id:
-        # Delete both linked transfer rows
         await db.execute(
             delete(Transaction).where(
                 Transaction.transfer_group_id == tx.transfer_group_id,

@@ -3,7 +3,7 @@ from datetime import datetime
 from datetime import date as DateType
 from decimal import Decimal
 from pydantic import BaseModel, field_validator
-from app.constants import CATEGORIES, MODES, TYPES
+from app.constants import TYPES
 
 
 class TransactionCreate(BaseModel):
@@ -24,20 +24,6 @@ class TransactionCreate(BaseModel):
             raise ValueError(f"type must be one of {TYPES}")
         return v
 
-    @field_validator("category")
-    @classmethod
-    def validate_category(cls, v: str) -> str:
-        if v not in CATEGORIES:
-            raise ValueError(f"category must be one of {CATEGORIES}")
-        return v
-
-    @field_validator("mode")
-    @classmethod
-    def validate_mode(cls, v: str) -> str:
-        if v not in MODES:
-            raise ValueError(f"mode must be one of {MODES}")
-        return v
-
     @field_validator("amount")
     @classmethod
     def validate_amount(cls, v: Decimal) -> Decimal:
@@ -54,20 +40,6 @@ class TransactionUpdate(BaseModel):
     bank_id: uuid.UUID | None = None
     mode: str | None = None
     notes: str | None = None
-
-    @field_validator("category")
-    @classmethod
-    def validate_category(cls, v: str | None) -> str | None:
-        if v is not None and v not in CATEGORIES:
-            raise ValueError(f"category must be one of {CATEGORIES}")
-        return v
-
-    @field_validator("mode")
-    @classmethod
-    def validate_mode(cls, v: str | None) -> str | None:
-        if v is not None and v not in MODES:
-            raise ValueError(f"mode must be one of {MODES}")
-        return v
 
     @field_validator("amount")
     @classmethod

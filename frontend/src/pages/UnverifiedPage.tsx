@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { unverifiedApi } from '../api/imports'
+import { categoriesApi } from '../api/categories'
+import { modesApi } from '../api/modes'
 import { UnverifiedTransaction } from '../types'
 import { formatAmount, formatDate } from '../utils/formatters'
-import { CATEGORIES, MODES } from '../utils/constants'
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
 export default function UnverifiedPage() {
@@ -13,6 +14,8 @@ export default function UnverifiedPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Partial<UnverifiedTransaction>>({})
   const [working, setWorking] = useState<string | null>(null)
+  const [categories, setCategories] = useState<string[]>([])
+  const [modes, setModes] = useState<string[]>([])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -26,6 +29,11 @@ export default function UnverifiedPage() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  useEffect(() => {
+    categoriesApi.list().then(r => setCategories(r.data.map(c => c.name)))
+    modesApi.list().then(r => setModes(r.data.map(m => m.name)))
+  }, [])
 
   const toggle = (id: string) => setSelected(s => {
     const n = new Set(s)
@@ -127,11 +135,11 @@ export default function UnverifiedPage() {
                         <input type="date" defaultValue={item.date || ''} onChange={e => setEditData(d => ({...d, date: e.target.value}))} className={cls} />
                         <input type="text" defaultValue={item.description || ''} onChange={e => setEditData(d => ({...d, description: e.target.value}))} className={cls} placeholder="Description" />
                         <select defaultValue={item.category || ''} onChange={e => setEditData(d => ({...d, category: e.target.value}))} className={cls}>
-                          {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                          {categories.map(c => <option key={c}>{c}</option>)}
                         </select>
                         <input type="number" step="0.01" defaultValue={item.amount || ''} onChange={e => setEditData(d => ({...d, amount: e.target.value}))} className={cls} placeholder="Amount" />
                         <select defaultValue={item.mode || ''} onChange={e => setEditData(d => ({...d, mode: e.target.value}))} className={cls}>
-                          {MODES.map(m => <option key={m}>{m}</option>)}
+                          {modes.map(m => <option key={m}>{m}</option>)}
                         </select>
                       </div>
                     ) : (

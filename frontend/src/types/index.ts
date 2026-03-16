@@ -70,12 +70,24 @@ export interface ImportJob {
   filename: string
   bank_hint: string | null
   llm_provider: string | null
-  status: 'processing' | 'completed' | 'failed'
+  status: 'processing' | 'extracting' | 'mapping' | 'completed' | 'failed'
   total_rows: number | null
   parsed_rows: number | null
   error_message: string | null
   created_at: string
   completed_at: string | null
+}
+
+export interface CategoryItem {
+  id: string
+  name: string
+  created_at: string
+}
+
+export interface ModeItem {
+  id: string
+  name: string
+  created_at: string
 }
 
 export interface Budget {

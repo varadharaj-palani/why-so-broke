@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { budgetsApi } from '../api/budgets'
+import { categoriesApi } from '../api/categories'
 import { Budget, BudgetProgress } from '../types'
 import { formatAmount, currentMonth, formatMonth } from '../utils/formatters'
-import { CATEGORIES } from '../utils/constants'
 import { PlusIcon } from '@heroicons/react/24/outline'
 
 function BudgetCard({ progress, onEdit, onDelete }: { progress: BudgetProgress; onEdit: () => void; onDelete: () => void }) {
@@ -41,9 +41,18 @@ export default function BudgetsPage() {
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editBudget, setEditBudget] = useState<Budget | null>(null)
-  const [formCategory, setFormCategory] = useState(CATEGORIES[0])
+  const [categories, setCategories] = useState<string[]>([])
+  const [formCategory, setFormCategory] = useState('')
   const [formAmount, setFormAmount] = useState('')
   const [copying, setCopying] = useState(false)
+
+  useEffect(() => {
+    categoriesApi.list().then(r => {
+      const names = r.data.map(c => c.name)
+      setCategories(names)
+      setFormCategory(names[0] || '')
+    })
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -114,7 +123,7 @@ export default function BudgetsPage() {
             <div>
               <label className="block text-xs text-gray-500 mb-1">Category</label>
               <select value={formCategory} onChange={e => setFormCategory(e.target.value)} className={cls}>
-                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                {categories.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
           )}

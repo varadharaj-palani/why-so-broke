@@ -8,9 +8,10 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_DAYS: int = 30
-    LLM_PROVIDER: Literal["claude", "openai"] = "claude"
+    LLM_PROVIDER: Literal["claude", "openai", "gemini"] = "gemini"
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
 
     class Config:

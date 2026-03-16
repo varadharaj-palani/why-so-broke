@@ -1,17 +1,18 @@
 import hashlib
 import os
-import tempfile
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.import_job import ImportJob
 from app.models.unverified_transaction import UnverifiedTransaction
 from app.models.bank import Bank
+from app.models.category import Category
+from app.models.mode import Mode
 from app.llm import get_llm_provider
 from app.llm.pdf_parser import extract_pages, chunk_pages
 from app.services import activity_service
 from app.database import AsyncSessionLocal
-from app.config import settings
+from app.constants import CATEGORIES, MODES
 
 
 def compute_hash(file_bytes: bytes) -> str:
@@ -19,7 +20,7 @@ def compute_hash(file_bytes: bytes) -> str:
 
 
 async def process_import(job_id: str, user_id: str, file_path: str, bank_hint: str | None) -> None:
-    """Background task: parse PDF, create unverified transactions, update job status."""
+    """Background task: two-phase PDF import (extract → map), creates unverified transactions."""
     async with AsyncSessionLocal() as db:
         try:
             result = await db.execute(select(ImportJob).where(ImportJob.id == job_id))
@@ -29,17 +30,53 @@ async def process_import(job_id: str, user_id: str, file_path: str, bank_hint: s
             chunks = chunk_pages(pages, chunk_size=4)
 
             provider = get_llm_provider()
-            all_transactions = []
 
+            # ── Phase 1: Extract raw rows ────────────────────────────────────
+            job.status = "extracting"
+            await db.commit()
+
+            all_raw_rows = []
             for chunk_text in chunks:
                 if not chunk_text.strip():
                     continue
                 try:
-                    statement = await provider.parse_statement(chunk_text, bank_hint)
-                    all_transactions.extend(statement.transactions)
+                    raw_rows = await provider.extract_rows(chunk_text, bank_hint)
+                    all_raw_rows.extend(raw_rows)
                 except Exception as e:
-                    # Partial failure: log but continue with other chunks
-                    print(f"Chunk parsing failed: {e}")
+                    print(f"Chunk extraction failed: {e}")
+                    continue
+
+            job.extracted_data = [r.model_dump(mode="json") for r in all_raw_rows]
+            await db.commit()
+
+            # ── Phase 2: Map rows to categories/modes ────────────────────────
+            job.status = "mapping"
+            await db.commit()
+
+            # Fetch user's categories/modes; fall back to constants if none seeded yet
+            cat_result = await db.execute(
+                select(Category).where(Category.user_id == user_id).order_by(Category.name)
+            )
+            user_categories = [c.name for c in cat_result.scalars().all()]
+            if not user_categories:
+                user_categories = list(CATEGORIES)
+
+            mode_result = await db.execute(
+                select(Mode).where(Mode.user_id == user_id).order_by(Mode.name)
+            )
+            user_modes = [m.name for m in mode_result.scalars().all()]
+            if not user_modes:
+                user_modes = list(MODES)
+
+            ROW_CHUNK_SIZE = 50
+            all_transactions = []
+            for i in range(0, len(all_raw_rows), ROW_CHUNK_SIZE):
+                chunk = all_raw_rows[i : i + ROW_CHUNK_SIZE]
+                try:
+                    parsed = await provider.map_rows(chunk, user_categories, user_modes)
+                    all_transactions.extend(parsed.transactions)
+                except Exception as e:
+                    print(f"Chunk mapping failed: {e}")
                     continue
 
             # Try to match bank_hint to a user bank
@@ -91,6 +128,5 @@ async def process_import(job_id: str, user_id: str, file_path: str, bank_hint: s
                     err_job.completed_at = datetime.now(timezone.utc)
                     await err_db.commit()
         finally:
-            # Always delete the temp file
             if os.path.exists(file_path):
                 os.remove(file_path)

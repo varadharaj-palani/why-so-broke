@@ -7,8 +7,18 @@ import api from '../api/client'
 
 const STATUS_COLORS: Record<string, string> = {
   processing: 'text-yellow-600 bg-yellow-50',
+  extracting: 'text-yellow-600 bg-yellow-50',
+  mapping: 'text-blue-600 bg-blue-50',
   completed: 'text-green-600 bg-green-50',
   failed: 'text-red-600 bg-red-50',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  processing: '⏳ Processing...',
+  extracting: '⏳ Extracting rows...',
+  mapping: '🔍 Mapping transactions...',
+  completed: 'completed',
+  failed: 'failed',
 }
 
 export default function ImportPage() {
@@ -32,7 +42,7 @@ export default function ImportPage() {
     const interval = setInterval(async () => {
       const res = await importsApi.get(pollingId)
       setJobs(jobs => jobs.map(j => j.id === pollingId ? res.data : j))
-      if (res.data.status !== 'processing') {
+      if (!['processing', 'extracting', 'mapping'].includes(res.data.status)) {
         setPollingId(null)
         clearInterval(interval)
       }
@@ -114,8 +124,8 @@ export default function ImportPage() {
                   {job.error_message && <p className="text-xs text-red-600 mt-0.5">{job.error_message}</p>}
                 </div>
                 <div className="text-right shrink-0">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[job.status]}`}>
-                    {job.status === 'processing' ? '⏳ Processing...' : job.status}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[job.status] || 'text-gray-600 bg-gray-50'}`}>
+                    {STATUS_LABELS[job.status] || job.status}
                   </span>
                   {job.status === 'completed' && (
                     <p className="text-xs text-gray-500 mt-1">{job.parsed_rows} transactions</p>

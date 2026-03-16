@@ -4,6 +4,14 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class RawRow(BaseModel):
+    date: str
+    description: str
+    debit: Decimal | None = None
+    credit: Decimal | None = None
+    raw_text: str = ""
+
+
 class ParsedTransaction(BaseModel):
     date: date
     description: str

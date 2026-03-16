@@ -9,5 +9,8 @@ def get_llm_provider() -> LLMProvider:
     elif settings.LLM_PROVIDER == "openai":
         from app.llm.openai_provider import OpenAIProvider
         return OpenAIProvider()
+    elif settings.LLM_PROVIDER == "gemini":
+        from app.llm.gemini_provider import GeminiProvider
+        return GeminiProvider()
     else:
         raise ValueError(f"Unknown LLM_PROVIDER: {settings.LLM_PROVIDER}")
