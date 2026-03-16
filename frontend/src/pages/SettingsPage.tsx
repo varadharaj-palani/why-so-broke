@@ -7,9 +7,12 @@ import api from '../api/client'
 import axios from 'axios'
 import { categoriesApi, CategoryItem } from '../api/categories'
 import { modesApi, ModeItem } from '../api/modes'
+import { useToast, Toast } from '../components/ui/Toast'
+import ConfirmModal from '../components/ui/ConfirmModal'
 
 export default function SettingsPage() {
   const { user, logout } = useAuth()
+  const { toast, showToast, clearToast } = useToast()
   const [banks, setBanks] = useState<Bank[]>([])
   const [newBankName, setNewBankName] = useState('')
   const [newBankCode, setNewBankCode] = useState('')
@@ -29,6 +32,12 @@ export default function SettingsPage() {
   const [editModeId, setEditModeId] = useState<string | null>(null)
   const [editModeName, setEditModeName] = useState('')
 
+  const [confirmDelete, setConfirmDelete] = useState<{
+    type: 'bank' | 'category' | 'mode'
+    id: string
+    name: string
+  } | null>(null)
+
   useEffect(() => {
     api.get('/banks').then(r => setBanks(r.data))
     api.get('/activity').then(r => setActivity(r.data.items))
@@ -40,10 +49,15 @@ export default function SettingsPage() {
 
   async function addBank() {
     if (!newBankName.trim()) return
-    const res = await api.post('/banks', { name: newBankName, short_code: newBankCode || undefined })
-    setBanks(b => [...b, res.data])
-    setNewBankName('')
-    setNewBankCode('')
+    try {
+      const res = await api.post('/banks', { name: newBankName, short_code: newBankCode || undefined })
+      setBanks(b => [...b, res.data])
+      setNewBankName('')
+      setNewBankCode('')
+      showToast('Bank added', 'success')
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to add bank', 'error')
+    }
   }
 
   async function toggleBank(bank: Bank) {
@@ -52,18 +66,23 @@ export default function SettingsPage() {
   }
 
   async function saveEditBank(id: string) {
-    const res = await api.put(`/banks/${id}`, { name: editBankName, short_code: editBankCode || undefined })
-    setBanks(b => b.map(x => x.id === id ? res.data : x))
-    setEditBankId(null)
+    try {
+      const res = await api.put(`/banks/${id}`, { name: editBankName, short_code: editBankCode || undefined })
+      setBanks(b => b.map(x => x.id === id ? res.data : x))
+      setEditBankId(null)
+      showToast('Bank updated', 'success')
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to update bank', 'error')
+    }
   }
 
   async function deleteBank(id: string) {
-    if (!confirm('Delete this bank? This cannot be undone.')) return
     try {
       await api.delete(`/banks/${id}`)
       setBanks(b => b.filter(x => x.id !== id))
+      showToast('Bank deleted', 'success')
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete bank')
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete bank', 'error')
     }
   }
 
@@ -75,8 +94,9 @@ export default function SettingsPage() {
       const res = await categoriesApi.create(newCategoryName.trim())
       setCategories(c => [...c, res.data].sort((a, b) => a.name.localeCompare(b.name)))
       setNewCategoryName('')
+      showToast('Category added', 'success')
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to add category')
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to add category', 'error')
     }
   }
 
@@ -85,18 +105,19 @@ export default function SettingsPage() {
       const res = await categoriesApi.update(id, editCategoryName.trim())
       setCategories(c => c.map(x => x.id === id ? res.data : x).sort((a, b) => a.name.localeCompare(b.name)))
       setEditCategoryId(null)
+      showToast('Category updated', 'success')
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to update')
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to update', 'error')
     }
   }
 
-  async function deleteCategory(id: string, name: string) {
-    if (!confirm(`Delete category "${name}"?`)) return
+  async function deleteCategory(id: string) {
     try {
       await categoriesApi.delete(id)
       setCategories(c => c.filter(x => x.id !== id))
+      showToast('Category deleted', 'success')
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete category')
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete category', 'error')
     }
   }
 
@@ -108,8 +129,9 @@ export default function SettingsPage() {
       const res = await modesApi.create(newModeName.trim())
       setModes(m => [...m, res.data].sort((a, b) => a.name.localeCompare(b.name)))
       setNewModeName('')
+      showToast('Payment mode added', 'success')
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to add mode')
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to add mode', 'error')
     }
   }
 
@@ -118,19 +140,31 @@ export default function SettingsPage() {
       const res = await modesApi.update(id, editModeName.trim())
       setModes(m => m.map(x => x.id === id ? res.data : x).sort((a, b) => a.name.localeCompare(b.name)))
       setEditModeId(null)
+      showToast('Payment mode updated', 'success')
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to update')
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to update', 'error')
     }
   }
 
-  async function deleteMode(id: string, name: string) {
-    if (!confirm(`Delete mode "${name}"?`)) return
+  async function deleteMode(id: string) {
     try {
       await modesApi.delete(id)
       setModes(m => m.filter(x => x.id !== id))
+      showToast('Payment mode deleted', 'success')
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete mode')
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete mode', 'error')
     }
+  }
+
+  // ── Confirm delete handler ────────────────────────────────────────────────
+
+  async function handleConfirmDelete() {
+    if (!confirmDelete) return
+    const { type, id } = confirmDelete
+    setConfirmDelete(null)
+    if (type === 'bank') await deleteBank(id)
+    else if (type === 'category') await deleteCategory(id)
+    else await deleteMode(id)
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
@@ -148,6 +182,9 @@ export default function SettingsPage() {
       a.download = 'why-so-broke-export.csv'
       a.click()
       URL.revokeObjectURL(url)
+      showToast('Export downloaded', 'success')
+    } catch {
+      showToast('Export failed', 'error')
     } finally {
       setExporting(false)
     }
@@ -162,14 +199,14 @@ export default function SettingsPage() {
 
       {/* Account */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Account</h3>
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">Account</h3>
         <p className="text-sm text-gray-600">Signed in as <strong>{user?.display_name || user?.username}</strong></p>
         <button onClick={logout} className="mt-3 text-sm text-red-500 hover:underline">Sign out</button>
       </div>
 
       {/* Export */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-1">Export Data</h3>
+        <h3 className="text-sm font-semibold text-gray-800 mb-1">Export Data</h3>
         <p className="text-xs text-gray-500 mb-3">Download all your transactions as a CSV file.</p>
         <button onClick={handleExport} disabled={exporting} className="bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
           {exporting ? 'Exporting...' : 'Export CSV'}
@@ -178,33 +215,38 @@ export default function SettingsPage() {
 
       {/* Banks */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Manage Banks</h3>
-        <div className="space-y-2 mb-4">
+        <h3 className="text-sm font-semibold text-gray-800 mb-0.5">Manage Banks</h3>
+        <p className="text-xs text-gray-500 mb-3">Add and manage your bank accounts.</p>
+        <div className="divide-y divide-gray-100 mb-4">
+          {banks.length === 0 && (
+            <p className="text-sm text-gray-400 italic py-2">No banks added yet.</p>
+          )}
           {banks.map(bank => (
-            <div key={bank.id} className="flex items-center gap-2">
+            <div key={bank.id} className="py-3 flex items-center gap-3">
               {editBankId === bank.id ? (
                 <>
                   <input type="text" value={editBankName} onChange={e => setEditBankName(e.target.value)} className={`flex-1 ${inlineCls}`} />
                   <input type="text" value={editBankCode} onChange={e => setEditBankCode(e.target.value)} className={`w-20 ${inlineCls}`} placeholder="Code" />
-                  <button onClick={() => saveEditBank(bank.id)} className="p-1 text-green-600 hover:bg-green-50 rounded"><CheckIcon className="w-4 h-4" /></button>
-                  <button onClick={() => setEditBankId(null)} className="p-1 text-gray-400 hover:bg-gray-50 rounded"><XMarkIcon className="w-4 h-4" /></button>
+                  <button onClick={() => saveEditBank(bank.id)} className="p-2 text-green-600 hover:bg-green-50 rounded"><CheckIcon className="w-4 h-4" /></button>
+                  <button onClick={() => setEditBankId(null)} className="p-2 text-gray-400 hover:bg-gray-50 rounded"><XMarkIcon className="w-4 h-4" /></button>
                 </>
               ) : (
                 <>
-                  <div className="flex-1">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${bank.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium ${bank.is_active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>{bank.name}</p>
                     {bank.short_code && <p className="text-xs text-gray-400">{bank.short_code}</p>}
                   </div>
                   <button
                     onClick={() => { setEditBankId(bank.id); setEditBankName(bank.name); setEditBankCode(bank.short_code || '') }}
-                    className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
                   >
                     <PencilIcon className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => toggleBank(bank)} className={`text-xs px-2 py-1 rounded ${bank.is_active ? 'text-red-500 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}>
                     {bank.is_active ? 'Deactivate' : 'Activate'}
                   </button>
-                  <button onClick={() => deleteBank(bank.id)} className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                  <button onClick={() => setConfirmDelete({ type: 'bank', id: bank.id, name: bank.name })} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
                     <TrashIcon className="w-3.5 h-3.5" />
                   </button>
                 </>
@@ -213,7 +255,7 @@ export default function SettingsPage() {
           ))}
         </div>
         <div className="flex gap-2">
-          <input type="text" value={newBankName} onChange={e => setNewBankName(e.target.value)} placeholder="Bank name" className={`flex-1 ${cls}`} />
+          <input type="text" value={newBankName} onChange={e => setNewBankName(e.target.value)} placeholder="Bank name" className={`flex-1 ${cls}`} onKeyDown={e => { if (e.key === 'Enter') addBank() }} />
           <input type="text" value={newBankCode} onChange={e => setNewBankCode(e.target.value)} placeholder="Code" className={`w-20 ${cls}`} />
           <button onClick={addBank} className="bg-green-600 text-white rounded-lg px-3 py-2 hover:bg-green-700">
             <PlusIcon className="w-4 h-4" />
@@ -223,28 +265,32 @@ export default function SettingsPage() {
 
       {/* Categories */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Categories</h3>
+        <h3 className="text-sm font-semibold text-gray-800 mb-0.5">Categories</h3>
+        <p className="text-xs text-gray-500 mb-3">Customize the categories used for your transactions.</p>
         <div className="flex flex-wrap gap-2 mb-4">
+          {categories.length === 0 && (
+            <p className="text-sm text-gray-400 italic py-2">No categories yet — add one below.</p>
+          )}
           {categories.map(cat => (
-            <div key={cat.id} className="flex items-center gap-1 bg-gray-100 rounded-full px-3 py-1">
+            <div key={cat.id} className="group relative flex items-center gap-1 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-full px-3 py-1">
               {editCategoryId === cat.id ? (
                 <>
                   <input
                     type="text"
                     value={editCategoryName}
                     onChange={e => setEditCategoryName(e.target.value)}
-                    className="text-xs border border-gray-300 rounded px-1 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="text-xs border border-indigo-300 rounded px-1 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                     autoFocus
                     onKeyDown={e => { if (e.key === 'Enter') saveEditCategory(cat.id); if (e.key === 'Escape') setEditCategoryId(null) }}
                   />
-                  <button onClick={() => saveEditCategory(cat.id)} className="text-green-600 hover:text-green-700"><CheckIcon className="w-3 h-3" /></button>
-                  <button onClick={() => setEditCategoryId(null)} className="text-gray-400 hover:text-gray-600"><XMarkIcon className="w-3 h-3" /></button>
+                  <button onClick={() => saveEditCategory(cat.id)} className="text-green-600 hover:text-green-700"><CheckIcon className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setEditCategoryId(null)} className="text-gray-400 hover:text-gray-600"><XMarkIcon className="w-3.5 h-3.5" /></button>
                 </>
               ) : (
                 <>
-                  <span className="text-xs text-gray-700">{cat.name}</span>
-                  <button onClick={() => { setEditCategoryId(cat.id); setEditCategoryName(cat.name) }} className="text-gray-400 hover:text-blue-600 ml-1"><PencilIcon className="w-3 h-3" /></button>
-                  <button onClick={() => deleteCategory(cat.id, cat.name)} className="text-gray-400 hover:text-red-600"><XMarkIcon className="w-3 h-3" /></button>
+                  <span className="text-xs font-medium">{cat.name}</span>
+                  <button onClick={() => { setEditCategoryId(cat.id); setEditCategoryName(cat.name) }} className="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-400 hover:text-blue-600 ml-1"><PencilIcon className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setConfirmDelete({ type: 'category', id: cat.id, name: cat.name })} className="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-400 hover:text-red-600"><XMarkIcon className="w-3.5 h-3.5" /></button>
                 </>
               )}
             </div>
@@ -267,28 +313,32 @@ export default function SettingsPage() {
 
       {/* Payment Modes */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Payment Modes</h3>
+        <h3 className="text-sm font-semibold text-gray-800 mb-0.5">Payment Modes</h3>
+        <p className="text-xs text-gray-500 mb-3">Manage payment methods like cash, UPI, card, etc.</p>
         <div className="flex flex-wrap gap-2 mb-4">
+          {modes.length === 0 && (
+            <p className="text-sm text-gray-400 italic py-2">No payment modes yet — add one below.</p>
+          )}
           {modes.map(mode => (
-            <div key={mode.id} className="flex items-center gap-1 bg-gray-100 rounded-full px-3 py-1">
+            <div key={mode.id} className="group relative flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-full px-3 py-1">
               {editModeId === mode.id ? (
                 <>
                   <input
                     type="text"
                     value={editModeName}
                     onChange={e => setEditModeName(e.target.value)}
-                    className="text-xs border border-gray-300 rounded px-1 py-0.5 w-24 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="text-xs border border-amber-300 rounded px-1 py-0.5 w-24 focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white"
                     autoFocus
                     onKeyDown={e => { if (e.key === 'Enter') saveEditMode(mode.id); if (e.key === 'Escape') setEditModeId(null) }}
                   />
-                  <button onClick={() => saveEditMode(mode.id)} className="text-green-600 hover:text-green-700"><CheckIcon className="w-3 h-3" /></button>
-                  <button onClick={() => setEditModeId(null)} className="text-gray-400 hover:text-gray-600"><XMarkIcon className="w-3 h-3" /></button>
+                  <button onClick={() => saveEditMode(mode.id)} className="text-green-600 hover:text-green-700"><CheckIcon className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setEditModeId(null)} className="text-gray-400 hover:text-gray-600"><XMarkIcon className="w-3.5 h-3.5" /></button>
                 </>
               ) : (
                 <>
-                  <span className="text-xs text-gray-700">{mode.name}</span>
-                  <button onClick={() => { setEditModeId(mode.id); setEditModeName(mode.name) }} className="text-gray-400 hover:text-blue-600 ml-1"><PencilIcon className="w-3 h-3" /></button>
-                  <button onClick={() => deleteMode(mode.id, mode.name)} className="text-gray-400 hover:text-red-600"><XMarkIcon className="w-3 h-3" /></button>
+                  <span className="text-xs font-medium">{mode.name}</span>
+                  <button onClick={() => { setEditModeId(mode.id); setEditModeName(mode.name) }} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-400 hover:text-blue-600 ml-1"><PencilIcon className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setConfirmDelete({ type: 'mode', id: mode.id, name: mode.name })} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-400 hover:text-red-600"><XMarkIcon className="w-3.5 h-3.5" /></button>
                 </>
               )}
             </div>
@@ -312,7 +362,8 @@ export default function SettingsPage() {
       {/* Activity log */}
       {activity.length > 0 && (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Recent Activity</h3>
+          <h3 className="text-sm font-semibold text-gray-800 mb-0.5">Recent Activity</h3>
+          <p className="text-xs text-gray-500 mb-3">A log of recent changes in your account.</p>
           <div className="space-y-2">
             {activity.map(a => (
               <div key={a.id} className="flex items-center justify-between">
@@ -323,6 +374,18 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm delete modal */}
+      <ConfirmModal
+        open={confirmDelete !== null}
+        title={`Delete ${confirmDelete?.type ?? ''}?`}
+        description={confirmDelete ? `Are you sure you want to delete "${confirmDelete.name}"? This cannot be undone.` : undefined}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
+
+      {/* Toast */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
     </div>
   )
 }
