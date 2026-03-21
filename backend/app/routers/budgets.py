@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,24 +15,20 @@ from app.services import activity_service
 router = APIRouter(prefix="/budgets", tags=["budgets"])
 
 
-def parse_month(month_str: str) -> date:
-    try:
-        year, month = month_str.split("-")
-        return date(int(year), int(month), 1)
-    except Exception:
-        raise HTTPException(status_code=400, detail="month must be in YYYY-MM format")
-
-
 @router.get("", response_model=list[BudgetOut])
 async def list_budgets(
-    month: str = Query(..., description="YYYY-MM format"),
+    start_date: date = Query(..., description="Cycle start date"),
+    end_date: date = Query(..., description="Cycle end date"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    month_date = parse_month(month)
     result = await db.execute(
         select(Budget)
-        .where(Budget.user_id == current_user.id, Budget.month == month_date)
+        .where(
+            Budget.user_id == current_user.id,
+            Budget.start_date >= start_date,
+            Budget.end_date <= end_date,
+        )
         .order_by(Budget.category)
     )
     return result.scalars().all()
@@ -44,12 +40,25 @@ async def create_budget(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    month_date = date(body.month.year, body.month.month, 1)
-    budget = Budget(user_id=current_user.id, category=body.category, month=month_date, amount=body.amount)
+    budget = Budget(
+        user_id=current_user.id,
+        category=body.category,
+        start_date=body.start_date,
+        end_date=body.end_date,
+        month=None,
+        amount=body.amount,
+    )
     db.add(budget)
     await db.flush()
-    await activity_service.log(db, current_user.id, "budget_set", "budget", budget.id,
-                                {"category": body.category, "month": str(month_date), "amount": float(body.amount)})
+    await activity_service.log(
+        db, current_user.id, "budget_set", "budget", budget.id,
+        {
+            "category": body.category,
+            "start_date": str(body.start_date),
+            "end_date": str(body.end_date),
+            "amount": float(body.amount),
+        },
+    )
     await db.commit()
     await db.refresh(budget)
     return budget
@@ -68,7 +77,12 @@ async def update_budget(
     budget = result.scalar_one_or_none()
     if not budget:
         raise HTTPException(status_code=404, detail="Budget not found")
-    budget.amount = body.amount
+    if body.amount is not None:
+        budget.amount = body.amount
+    if body.start_date is not None:
+        budget.start_date = body.start_date
+    if body.end_date is not None:
+        budget.end_date = body.end_date
     await db.commit()
     await db.refresh(budget)
     return budget
@@ -92,15 +106,17 @@ async def delete_budget(
 
 @router.get("/progress", response_model=list[BudgetProgress])
 async def budget_progress(
-    month: str = Query(..., description="YYYY-MM format"),
+    start_date: date = Query(..., description="Cycle start date"),
+    end_date: date = Query(..., description="Cycle end date"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    month_date = parse_month(month)
-    next_month_date = date(month_date.year + (month_date.month // 12), ((month_date.month % 12) + 1), 1)
-
     budgets_result = await db.execute(
-        select(Budget).where(Budget.user_id == current_user.id, Budget.month == month_date)
+        select(Budget).where(
+            Budget.user_id == current_user.id,
+            Budget.start_date >= start_date,
+            Budget.end_date <= end_date,
+        )
     )
     budgets = budgets_result.scalars().all()
 
@@ -113,8 +129,8 @@ async def budget_progress(
                     Transaction.user_id == current_user.id,
                     Transaction.category == budget.category,
                     Transaction.type == "expense",
-                    Transaction.date >= month_date,
-                    Transaction.date < next_month_date,
+                    Transaction.date >= start_date,
+                    Transaction.date <= end_date,
                 )
             )
         )
@@ -125,41 +141,59 @@ async def budget_progress(
             budget_amount=budget.amount,
             spent_amount=spent,
             percentage=round(pct, 1),
+            start_date=budget.start_date,
+            end_date=budget.end_date,
         ))
 
     return sorted(progress, key=lambda x: x.percentage, reverse=True)
 
 
 @router.post("/copy-previous")
-async def copy_previous_month(
-    month: str = Query(..., description="YYYY-MM format — target month to copy budgets INTO"),
+async def copy_previous_cycle(
+    start_date: date = Query(..., description="Target cycle start date"),
+    end_date: date = Query(..., description="Target cycle end date"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    target = parse_month(month)
-    prev_month = target.month - 1
-    prev_year = target.year
-    if prev_month == 0:
-        prev_month = 12
-        prev_year -= 1
-    prev_date = date(prev_year, prev_month, 1)
-
+    """Copy budgets from the most recent past cycle into a new cycle."""
+    # Find the most recent past budgets (end_date before target start)
     prev_result = await db.execute(
-        select(Budget).where(Budget.user_id == current_user.id, Budget.month == prev_date)
+        select(Budget)
+        .where(
+            Budget.user_id == current_user.id,
+            Budget.end_date < start_date,
+        )
+        .order_by(Budget.end_date.desc())
     )
-    prev_budgets = prev_result.scalars().all()
+    all_prev = prev_result.scalars().all()
 
-    if not prev_budgets:
-        raise HTTPException(status_code=404, detail="No budgets found for previous month")
+    if not all_prev:
+        raise HTTPException(status_code=404, detail="No previous budgets found")
+
+    # Find the most recent end_date
+    latest_end = max(b.end_date for b in all_prev if b.end_date)
+    prev_budgets = [b for b in all_prev if b.end_date == latest_end]
+    duration = end_date - start_date
 
     created = 0
     for b in prev_budgets:
         existing = await db.execute(
-            select(Budget).where(Budget.user_id == current_user.id, Budget.category == b.category, Budget.month == target)
+            select(Budget).where(
+                Budget.user_id == current_user.id,
+                Budget.category == b.category,
+                Budget.start_date == start_date,
+            )
         )
         if not existing.scalar_one_or_none():
-            db.add(Budget(user_id=current_user.id, category=b.category, month=target, amount=b.amount))
+            db.add(Budget(
+                user_id=current_user.id,
+                category=b.category,
+                start_date=start_date,
+                end_date=end_date,
+                month=None,
+                amount=b.amount,
+            ))
             created += 1
 
     await db.commit()
-    return {"copied": created, "month": str(target)}
+    return {"copied": created, "start_date": str(start_date), "end_date": str(end_date)}

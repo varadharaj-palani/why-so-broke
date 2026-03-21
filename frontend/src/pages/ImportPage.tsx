@@ -80,55 +80,97 @@ export default function ImportPage() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Import Statement</h2>
+  const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
+  const fiStyle = { background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }
 
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Import statement</h2>
+        <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>Upload a bank PDF · AI extracts and categorises transactions</p>
+      </div>
+
+      <div style={{ maxWidth: 540 }}>
         <form onSubmit={handleUpload} className="space-y-4">
+          {/* Dropzone */}
           <div
-            className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-green-400 transition-colors"
+            className="rounded-xl text-center cursor-pointer transition-all"
+            style={{
+              border: '1.5px dashed var(--border2)',
+              padding: '38px 20px',
+              background: file ? 'var(--gl)' : 'var(--surface)',
+              borderColor: file ? 'var(--green)' : 'var(--border2)',
+            }}
             onClick={() => fileRef.current?.click()}
+            onMouseEnter={e => {
+              if (!file) {
+                e.currentTarget.style.borderColor = 'var(--green)'
+                e.currentTarget.style.background = 'var(--gl)'
+              }
+            }}
+            onMouseLeave={e => {
+              if (!file) {
+                e.currentTarget.style.borderColor = 'var(--border2)'
+                e.currentTarget.style.background = 'var(--surface)'
+              }
+            }}
           >
-            <ArrowUpTrayIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-600 font-medium">{file ? file.name : 'Click to upload PDF'}</p>
-            <p className="text-xs text-gray-400 mt-1">Bank statement PDF, max 10MB</p>
+            <ArrowUpTrayIcon className="w-8 h-8 mx-auto mb-2.5" style={{ color: 'var(--text3)' }} />
+            <p className="text-[14px] font-medium mb-1" style={{ color: 'var(--text)' }}>
+              {file ? file.name : 'Click to upload PDF'}
+            </p>
+            <p className="text-[12px]" style={{ color: 'var(--text3)' }}>Bank statement · max 10MB</p>
             <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
           </div>
 
+          {/* Bank selector */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Bank (optional — helps AI parsing)</label>
-            <select value={bankHint} onChange={e => setBankHint(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-              <option value="">Select bank...</option>
+            <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>
+              Bank <span className="font-normal" style={{ color: 'var(--text3)' }}>(optional — helps AI parsing)</span>
+            </label>
+            <select value={bankHint} onChange={e => setBankHint(e.target.value)} className={fi} style={fiStyle}>
+              <option value="">Select bank…</option>
               {banks.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
             </select>
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {/* Info box */}
+          <div className="rounded-md p-3 text-[12px] leading-relaxed" style={{ background: 'var(--bg)', color: 'var(--text3)' }}>
+            <strong style={{ color: 'var(--text2)', fontWeight: 500 }}>How it works:</strong> Your PDF is parsed by AI to extract transactions. You'll review each one in Unverified before anything is saved.
+          </div>
 
-          <button type="submit" disabled={!file || uploading} className="w-full bg-green-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
-            {uploading ? 'Uploading...' : 'Import Statement'}
+          {error && <p className="text-[13px] text-red-500">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={!file || uploading}
+            className="w-full py-2.5 rounded-md text-[13px] text-white disabled:opacity-50 flex items-center justify-center"
+            style={{ background: 'var(--green)' }}
+          >
+            {uploading ? 'Importing…' : 'Import statement'}
           </button>
         </form>
       </div>
 
       {jobs.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Import History</h3>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
-            {jobs.map(job => (
-              <div key={job.id} className="p-4 flex items-center gap-3">
+          <h3 className="text-[13px] font-medium mb-2" style={{ color: 'var(--text2)' }}>Import history</h3>
+          <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+            {jobs.map((job, i) => (
+              <div key={job.id} className="p-4 flex items-center gap-3" style={{ borderBottom: i < jobs.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{job.filename}</p>
-                  <p className="text-xs text-gray-500">{formatDateTime(job.created_at)} {job.bank_hint ? `· ${job.bank_hint}` : ''}</p>
-                  {job.error_message && <p className="text-xs text-red-600 mt-0.5">{job.error_message}</p>}
+                  <p className="text-[13px] font-medium truncate" style={{ color: 'var(--text)' }}>{job.filename}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>
+                    {formatDateTime(job.created_at)}{job.bank_hint ? ` · ${job.bank_hint}` : ''}
+                  </p>
+                  {job.error_message && <p className="text-[11px] mt-0.5 text-red-500">{job.error_message}</p>}
                 </div>
                 <div className="text-right shrink-0">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[job.status] || 'text-gray-600 bg-gray-50'}`}>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[job.status] || 'text-gray-600 bg-gray-50'}`}>
                     {STATUS_LABELS[job.status] || job.status}
                   </span>
                   {job.status === 'completed' && (
-                    <p className="text-xs text-gray-500 mt-1">{job.parsed_rows} transactions</p>
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>{job.parsed_rows} transactions</p>
                   )}
                 </div>
               </div>
