@@ -221,9 +221,12 @@ export default function TransactionsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
+      // Drilldown takes highest priority, then explicit panel date filters, then view pills
       const dates = drillMonth
         ? { date_from: `${drillMonth}-01`, date_to: dayjs(`${drillMonth}-01`).endOf('month').format('YYYY-MM-DD') }
-        : getViewDates(view)
+        : (filters.date_from || filters.date_to)
+          ? {}
+          : getViewDates(view)
       const res = await transactionsApi.list({
         ...filters,
         ...dates,
@@ -253,7 +256,14 @@ export default function TransactionsPage() {
 
   function handleApplyFilters(f: Partial<typeof filters>) {
     setFilters(f)
-    const count = Object.values(f).filter(Boolean).length
+    // date_from + date_to together count as 1 filter row
+    const count = [
+      f.date_from || f.date_to,
+      f.category,
+      f.bank_id,
+      f.mode,
+      f.type,
+    ].filter(Boolean).length
     setActiveFilterCount(count)
   }
 
