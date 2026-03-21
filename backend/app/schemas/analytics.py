@@ -1,3 +1,4 @@
+from datetime import date as DateType
 from decimal import Decimal
 from pydantic import BaseModel
 
@@ -22,4 +23,9 @@ class MonthlyTrendItem(BaseModel):
 
 class ModeBreakdown(BaseModel):
     mode: str
+    total: Decimal
+
+
+class DailySpendItem(BaseModel):
+    date: DateType
     total: Decimal

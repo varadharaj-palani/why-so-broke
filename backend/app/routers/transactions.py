@@ -65,6 +65,7 @@ async def list_transactions(
     bank_id: Optional[uuid.UUID] = Query(None),
     mode: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
+    description: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -76,6 +77,8 @@ async def list_transactions(
         amount_min=amount_min, amount_max=amount_max,
         category=category, bank_id=bank_id, mode=mode, type=type,
     )
+    if description:
+        conditions.append(Transaction.description.ilike(f"%{description}%"))
     total_result = await db.execute(select(func.count()).select_from(Transaction).where(and_(*conditions)))
     total = total_result.scalar_one()
 
