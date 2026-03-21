@@ -16,18 +16,26 @@ from app.services import activity_service
 router = APIRouter(prefix="/budgets", tags=["budgets"])
 
 
+def get_current_cycle(start: date, end: date, today: date) -> tuple[date, date]:
+    """Compute the current recurring cycle that contains `today`."""
+    if today < start:
+        return start, end
+    duration = (end - start).days + 1
+    n = (today - start).days // duration
+    cs = start + timedelta(days=n * duration)
+    ce = cs + timedelta(days=duration - 1)
+    return cs, ce
+
+
 @router.get("", response_model=list[BudgetOut])
 async def list_budgets(
-    start_date: date | None = Query(None, description="Filter: budgets overlapping on or after this date"),
-    end_date: date | None = Query(None, description="Filter: budgets overlapping on or before this date"),
+    active_on: date | None = Query(None, description="Return budgets whose first cycle has started on or before this date"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     conditions = [Budget.user_id == current_user.id]
-    if start_date is not None:
-        conditions.append(Budget.end_date >= start_date)
-    if end_date is not None:
-        conditions.append(Budget.start_date <= end_date)
+    if active_on is not None:
+        conditions.append(Budget.start_date <= active_on)
     result = await db.execute(
         select(Budget).where(*conditions).order_by(Budget.category)
     )
@@ -40,11 +48,12 @@ async def create_budget(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    end_date = body.start_date + timedelta(days=body.cycle_days - 1)
     budget = Budget(
         user_id=current_user.id,
         category=body.category,
         start_date=body.start_date,
-        end_date=body.end_date,
+        end_date=end_date,
         month=None,
         amount=body.amount,
     )
@@ -59,7 +68,7 @@ async def create_budget(
         {
             "category": body.category,
             "start_date": str(body.start_date),
-            "end_date": str(body.end_date),
+            "cycle_days": body.cycle_days,
             "amount": float(body.amount),
         },
     )
@@ -81,12 +90,22 @@ async def update_budget(
     budget = result.scalar_one_or_none()
     if not budget:
         raise HTTPException(status_code=404, detail="Budget not found")
+
     if body.amount is not None:
         budget.amount = body.amount
-    if body.start_date is not None:
+
+    if body.cycle_days is not None:
+        base = body.start_date if body.start_date is not None else budget.start_date
+        if body.start_date is not None:
+            budget.start_date = body.start_date
+        budget.end_date = base + timedelta(days=body.cycle_days - 1)
+    elif body.start_date is not None:
+        # Only start_date changed — preserve cycle duration
+        if budget.start_date and budget.end_date:
+            duration_days = (budget.end_date - budget.start_date).days
+            budget.end_date = body.start_date + timedelta(days=duration_days)
         budget.start_date = body.start_date
-    if body.end_date is not None:
-        budget.end_date = body.end_date
+
     await db.commit()
     await db.refresh(budget)
     return budget
@@ -110,22 +129,21 @@ async def delete_budget(
 
 @router.get("/progress", response_model=list[BudgetProgress])
 async def budget_progress(
-    start_date: date = Query(..., description="Cycle start date"),
-    end_date: date = Query(..., description="Cycle end date"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    today = date.today()
     budgets_result = await db.execute(
         select(Budget).where(
             Budget.user_id == current_user.id,
-            Budget.start_date >= start_date,
-            Budget.end_date <= end_date,
+            Budget.start_date <= today,
         )
     )
     budgets = budgets_result.scalars().all()
 
     progress = []
     for budget in budgets:
+        cs, ce = get_current_cycle(budget.start_date, budget.end_date, today)
         spent_result = await db.execute(
             select(func.coalesce(func.sum(Transaction.amount), 0))
             .where(
@@ -133,8 +151,8 @@ async def budget_progress(
                     Transaction.user_id == current_user.id,
                     Transaction.category == budget.category,
                     Transaction.type == "expense",
-                    Transaction.date >= start_date,
-                    Transaction.date <= end_date,
+                    Transaction.date >= cs,
+                    Transaction.date <= ce,
                 )
             )
         )
@@ -145,59 +163,8 @@ async def budget_progress(
             budget_amount=budget.amount,
             spent_amount=spent,
             percentage=round(pct, 1),
-            start_date=budget.start_date,
-            end_date=budget.end_date,
+            current_cycle_start=cs,
+            current_cycle_end=ce,
         ))
 
     return sorted(progress, key=lambda x: x.percentage, reverse=True)
-
-
-@router.post("/copy-previous")
-async def copy_previous_cycle(
-    start_date: date = Query(..., description="Target cycle start date"),
-    end_date: date = Query(..., description="Target cycle end date"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Copy budgets from the most recent past cycle into a new cycle."""
-    # Find the most recent past budgets (end_date before target start)
-    prev_result = await db.execute(
-        select(Budget)
-        .where(
-            Budget.user_id == current_user.id,
-            Budget.end_date < start_date,
-        )
-        .order_by(Budget.end_date.desc())
-    )
-    all_prev = prev_result.scalars().all()
-
-    if not all_prev:
-        raise HTTPException(status_code=404, detail="No previous budgets found")
-
-    # Find the most recent end_date
-    latest_end = max(b.end_date for b in all_prev if b.end_date)
-    prev_budgets = [b for b in all_prev if b.end_date == latest_end]
-    duration = end_date - start_date
-
-    created = 0
-    for b in prev_budgets:
-        existing = await db.execute(
-            select(Budget).where(
-                Budget.user_id == current_user.id,
-                Budget.category == b.category,
-                Budget.start_date == start_date,
-            )
-        )
-        if not existing.scalar_one_or_none():
-            db.add(Budget(
-                user_id=current_user.id,
-                category=b.category,
-                start_date=start_date,
-                end_date=end_date,
-                month=None,
-                amount=b.amount,
-            ))
-            created += 1
-
-    await db.commit()
-    return {"copied": created, "start_date": str(start_date), "end_date": str(end_date)}

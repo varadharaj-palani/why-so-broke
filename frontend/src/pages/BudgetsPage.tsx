@@ -7,8 +7,21 @@ import { getCategoryChip } from '../utils/constants'
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
 const TODAY = new Date().toISOString().slice(0, 10)
-const YEAR_START = TODAY.slice(0, 4) + '-01-01'
-const YEAR_END = TODAY.slice(0, 4) + '-12-31'
+
+const PRESETS = [
+  { label: 'Monthly', days: 30 },
+  { label: '2 months', days: 60 },
+  { label: 'Quarterly', days: 90 },
+  { label: 'Custom', days: 0 },
+]
+
+function daysToPreset(days: number | null | undefined): string {
+  if (!days) return 'monthly'
+  if (days === 30) return 'monthly'
+  if (days === 60) return '2months'
+  if (days === 90) return 'quarterly'
+  return 'custom'
+}
 
 // ─── Budget Modal ──────────────────────────────────────────────────────────────
 
@@ -21,13 +34,19 @@ function BudgetModal({
   budget: Budget | null
   categories: string[]
   onClose: () => void
-  onSave: (data: { category: string; amount: string; start_date: string; end_date: string }) => Promise<void>
+  onSave: (data: { category: string; amount: string; start_date: string; cycle_days: number }) => Promise<void>
 }) {
+  const existingCycleDays = budget?.cycle_days ?? null
+  const preset = daysToPreset(existingCycleDays)
+
   const [form, setForm] = useState({
     category: budget?.category ?? (categories[0] ?? ''),
     amount: budget?.amount ?? '',
     start_date: budget?.start_date ?? '',
-    end_date: budget?.end_date ?? '',
+    preset,
+    custom_days: existingCycleDays && !['monthly', '2months', 'quarterly'].includes(preset)
+      ? String(existingCycleDays)
+      : '1',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -42,19 +61,26 @@ function BudgetModal({
     </div>
   )
 
+  function getCycleDays(): number {
+    if (form.preset === 'monthly') return 30
+    if (form.preset === '2months') return 60
+    if (form.preset === 'quarterly') return 90
+    return parseInt(form.custom_days) || 1
+  }
+
   async function handleSave() {
-    if (!form.category || !form.amount || !form.start_date || !form.end_date) {
+    if (!form.category || !form.amount || !form.start_date) {
       setError('All fields are required')
       return
     }
-    if (form.end_date < form.start_date) {
-      setError('End date must be after start date')
+    if (form.preset === 'custom' && (!form.custom_days || parseInt(form.custom_days) < 1)) {
+      setError('Custom cycle must be at least 1 day')
       return
     }
     setSaving(true)
     setError('')
     try {
-      await onSave(form)
+      await onSave({ category: form.category, amount: form.amount, start_date: form.start_date, cycle_days: getCycleDays() })
     } catch (err: unknown) {
       setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to save')
     } finally {
@@ -89,14 +115,38 @@ function BudgetModal({
           <input type="number" min="1" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={fi} style={fiStyle} placeholder="e.g. 5000" />
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          {field('Cycle start',
-            <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className={fi} style={fiStyle} />
-          )}
-          {field('Cycle end',
-            <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className={fi} style={fiStyle} />
-          )}
-        </div>
+        {field('First cycle starts on',
+          <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className={fi} style={fiStyle} />
+        )}
+
+        {field('Repeats every',
+          <div className="flex gap-2">
+            <select
+              value={form.preset}
+              onChange={e => setForm({ ...form, preset: e.target.value })}
+              className={fi}
+              style={fiStyle}
+            >
+              {PRESETS.map(p => (
+                <option key={p.label} value={p.label === 'Custom' ? 'custom' : p.label === 'Monthly' ? 'monthly' : p.label === '2 months' ? '2months' : 'quarterly'}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            {form.preset === 'custom' && (
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <input
+                  type="number" min="1" max="365"
+                  value={form.custom_days}
+                  onChange={e => setForm({ ...form, custom_days: e.target.value })}
+                  className="w-20 border rounded-md px-2 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
+                  style={fiStyle}
+                />
+                <span className="text-[13px] whitespace-nowrap" style={{ color: 'var(--text3)' }}>days</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {error && <p className="text-[12px] text-red-500">{error}</p>}
 
@@ -131,6 +181,9 @@ function BudgetCard({
   const pct = progress ? Math.min(progress.percentage, 100) : 0
   const over = progress ? progress.percentage > 100 : false
 
+  const cycleStart = progress?.current_cycle_start ?? budget.start_date
+  const cycleEnd = progress?.current_cycle_end ?? budget.end_date
+
   return (
     <div
       className="rounded-xl border p-4 cursor-pointer transition-all"
@@ -162,9 +215,9 @@ function BudgetCard({
             ? `${formatAmount(progress.spent_amount)} spent · Limit ${formatAmount(progress.budget_amount)}`
             : `Limit ${formatAmount(budget.amount)}`}
         </p>
-        {budget.start_date && budget.end_date && (
+        {cycleStart && cycleEnd && (
           <p className="text-[11px]" style={{ color: 'var(--text3)' }}>
-            {formatDate(budget.start_date)} → {formatDate(budget.end_date)}
+            {formatDate(cycleStart)} → {formatDate(cycleEnd)}
           </p>
         )}
       </div>
@@ -209,22 +262,12 @@ export default function BudgetsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      // Active: pass today as both params so backend returns only budgets containing today.
-      // All: no params so backend returns everything.
-      const listParams = tab === 'active' ? { start_date: TODAY, end_date: TODAY } : {}
-      const bRes = await budgetsApi.list(listParams)
-      const all = bRes.data
-      setBudgets(all)
-
-      const withDates = all.filter(b => b.start_date && b.end_date)
-      const pStart = withDates.length
-        ? withDates.reduce((m, b) => (b.start_date! < m ? b.start_date! : m), withDates[0].start_date!)
-        : YEAR_START
-      const pEnd = withDates.length
-        ? withDates.reduce((m, b) => (b.end_date! > m ? b.end_date! : m), withDates[0].end_date!)
-        : YEAR_END
-
-      const pRes = await budgetsApi.progress({ start_date: pStart, end_date: pEnd })
+      const listParams = tab === 'active' ? { active_on: TODAY } : undefined
+      const [bRes, pRes] = await Promise.all([
+        budgetsApi.list(listParams),
+        budgetsApi.progress(),
+      ])
+      setBudgets(bRes.data)
       setProgress(pRes.data)
     } finally {
       setLoading(false)
@@ -233,11 +276,9 @@ export default function BudgetsPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const visible = budgets
-
-  async function handleSave(data: { category: string; amount: string; start_date: string; end_date: string }) {
+  async function handleSave(data: { category: string; amount: string; start_date: string; cycle_days: number }) {
     if (modalBudget && modalBudget !== 'new') {
-      await budgetsApi.update(modalBudget.id, { amount: data.amount, start_date: data.start_date, end_date: data.end_date })
+      await budgetsApi.update(modalBudget.id, { amount: data.amount, start_date: data.start_date, cycle_days: data.cycle_days })
     } else {
       await budgetsApi.create(data)
     }
@@ -256,7 +297,7 @@ export default function BudgetsPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Budgets</h2>
-          <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>Track spending against your budget cycles</p>
+          <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>Recurring budgets — resets automatically each cycle</p>
         </div>
         <button
           onClick={() => setModalBudget('new')}
@@ -292,10 +333,10 @@ export default function BudgetsPage() {
             <div key={i} className="h-28 rounded-xl animate-pulse" style={{ background: 'var(--border)' }} />
           ))}
         </div>
-      ) : visible.length === 0 ? (
+      ) : budgets.length === 0 ? (
         <div className="py-12 text-center rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
           <p className="text-[13px] mb-2" style={{ color: 'var(--text3)' }}>
-            {tab === 'active' ? 'No active budgets for today.' : 'No budgets yet.'}
+            {tab === 'active' ? 'No active budgets.' : 'No budgets yet.'}
           </p>
           <button
             onClick={() => setModalBudget('new')}
@@ -307,7 +348,7 @@ export default function BudgetsPage() {
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-3">
-          {visible.map(b => (
+          {budgets.map(b => (
             <BudgetCard
               key={b.id}
               budget={b}

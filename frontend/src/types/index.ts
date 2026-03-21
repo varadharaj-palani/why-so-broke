@@ -96,6 +96,7 @@ export interface Budget {
   month: string | null
   start_date: string | null
   end_date: string | null
+  cycle_days: number | null
   amount: string
   created_at: string
   updated_at: string
@@ -106,8 +107,8 @@ export interface BudgetProgress {
   budget_amount: string
   spent_amount: string
   percentage: number
-  start_date?: string | null
-  end_date?: string | null
+  current_cycle_start: string
+  current_cycle_end: string
 }
 
 export interface DailySpendItem {
