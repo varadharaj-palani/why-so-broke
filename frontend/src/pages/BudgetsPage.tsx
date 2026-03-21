@@ -209,17 +209,19 @@ export default function BudgetsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const bRes = await budgetsApi.list({})
+      // Active: pass today as both params so backend returns only budgets containing today.
+      // All: no params so backend returns everything.
+      const listParams = tab === 'active' ? { start_date: TODAY, end_date: TODAY } : {}
+      const bRes = await budgetsApi.list(listParams)
       const all = bRes.data
       setBudgets(all)
 
-      const active = all.filter(b => b.start_date && b.end_date && b.start_date <= TODAY && TODAY <= b.end_date)
-      const source = tab === 'active' ? active : all.filter(b => b.start_date && b.end_date)
-      const pStart = source.length
-        ? source.reduce((m, b) => (b.start_date! < m ? b.start_date! : m), source[0].start_date!)
+      const withDates = all.filter(b => b.start_date && b.end_date)
+      const pStart = withDates.length
+        ? withDates.reduce((m, b) => (b.start_date! < m ? b.start_date! : m), withDates[0].start_date!)
         : YEAR_START
-      const pEnd = source.length
-        ? source.reduce((m, b) => (b.end_date! > m ? b.end_date! : m), source[0].end_date!)
+      const pEnd = withDates.length
+        ? withDates.reduce((m, b) => (b.end_date! > m ? b.end_date! : m), withDates[0].end_date!)
         : YEAR_END
 
       const pRes = await budgetsApi.progress({ start_date: pStart, end_date: pEnd })
@@ -231,9 +233,7 @@ export default function BudgetsPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const visible = tab === 'active'
-    ? budgets.filter(b => b.start_date && b.end_date && b.start_date <= TODAY && TODAY <= b.end_date)
-    : budgets
+  const visible = budgets
 
   async function handleSave(data: { category: string; amount: string; start_date: string; end_date: string }) {
     if (modalBudget && modalBudget !== 'new') {
