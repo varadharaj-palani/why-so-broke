@@ -51,7 +51,11 @@ export default function FilterPanel({ categories, modes, banks, initialFilters, 
   const [rows, setRows] = useState<FilterRow[]>(() => filtersToRows(initialFilters ?? {}))
 
   function addRow() {
-    setRows(r => [...r, { field: 'category' }])
+    setRows(r => {
+      const used = r.map(x => x.field)
+      const next = (Object.keys(FIELD_LABELS) as FieldKey[]).find(k => !used.includes(k)) ?? 'category'
+      return [...r, { field: next }]
+    })
   }
 
   function removeRow(i: number) {
@@ -114,7 +118,10 @@ export default function FilterPanel({ categories, modes, banks, initialFilters, 
               style={selectStyle}
             >
               {(Object.keys(FIELD_LABELS) as FieldKey[]).map(k => (
-                <option key={k} value={k}>{FIELD_LABELS[k]}</option>
+                // Hide fields already used in other rows
+                (k === row.field || !rows.some((r, idx) => idx !== i && r.field === k)) && (
+                  <option key={k} value={k}>{FIELD_LABELS[k]}</option>
+                )
               ))}
             </select>
             <span className="text-[12px] flex-shrink-0" style={{ color: 'var(--text3)' }}>is</span>
@@ -147,9 +154,11 @@ export default function FilterPanel({ categories, modes, banks, initialFilters, 
         ))}
       </div>
 
-      <button onClick={addRow} className="text-[13px] flex items-center gap-1.5 mb-4" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)' }}>
-        <span className="text-base leading-none">+</span> Add filter
-      </button>
+      {rows.length < Object.keys(FIELD_LABELS).length && (
+        <button onClick={addRow} className="text-[13px] flex items-center gap-1.5 mb-4" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)' }}>
+          <span className="text-base leading-none">+</span> Add filter
+        </button>
+      )}
 
       <div className="flex justify-end gap-2 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
         <button onClick={handleClear} className="px-3 py-1.5 text-[13px] border rounded-md" style={{ borderColor: 'var(--border2)', color: 'var(--text2)', background: 'var(--surface)' }}>

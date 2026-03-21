@@ -3,7 +3,6 @@ import { transactionsApi } from '../api/transactions'
 import { categoriesApi } from '../api/categories'
 import { modesApi } from '../api/modes'
 import { Transaction } from '../types'
-import { useFilterStore } from '../store/filterStore'
 import { formatAmount } from '../utils/formatters'
 import { getCategoryChip, TYPES } from '../utils/constants'
 import { PlusIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline'
@@ -198,13 +197,16 @@ const VIEW_LABELS: Record<TxView, string> = {
 }
 
 export default function TransactionsPage() {
-  const { filters, setFilters, clearFilters } = useFilterStore()
+  // Local panel filters — intentionally NOT using the global filterStore to avoid
+  // bleeding in dates set by DashboardPage or other pages.
+  const [panelFilters, setPanelFilters] = useState<{ date_from?: string; date_to?: string; category?: string; bank_id?: string; mode?: string; type?: string }>({})
+  const [activeFilterCount, setActiveFilterCount] = useState(0)
+
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
   const [showFilters, setShowFilters] = useState(false)
-  const [activeFilterCount, setActiveFilterCount] = useState(0)
   const [view, setView] = useState<TxView>('month')
   const [drillMonth, setDrillMonth] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -221,14 +223,14 @@ export default function TransactionsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      // Drilldown takes highest priority, then explicit panel date filters, then view pills
+      // Priority: drilldown > explicit panel date > view pill date
       const dates = drillMonth
         ? { date_from: `${drillMonth}-01`, date_to: dayjs(`${drillMonth}-01`).endOf('month').format('YYYY-MM-DD') }
-        : (filters.date_from || filters.date_to)
+        : (panelFilters.date_from || panelFilters.date_to)
           ? {}
           : getViewDates(view)
       const res = await transactionsApi.list({
-        ...filters,
+        ...panelFilters,
         ...dates,
         description: search || undefined,
         per_page: 500,
@@ -237,14 +239,14 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [view, drillMonth, filters, search])
+  }, [view, drillMonth, panelFilters, search])
 
   useEffect(() => { fetchData() }, [fetchData])
 
   function handleViewChange(v: TxView) {
     setView(v)
     setDrillMonth(null)
-    clearFilters()
+    setPanelFilters({})
     setActiveFilterCount(0)
   }
 
@@ -254,8 +256,8 @@ export default function TransactionsPage() {
     fetchData()
   }
 
-  function handleApplyFilters(f: Partial<typeof filters>) {
-    setFilters(f)
+  function handleApplyFilters(f: typeof panelFilters) {
+    setPanelFilters(f)
     // date_from + date_to together count as 1 filter row
     const count = [
       f.date_from || f.date_to,
@@ -395,7 +397,7 @@ export default function TransactionsPage() {
           categories={categories}
           modes={modes}
           banks={banks}
-          initialFilters={filters}
+          initialFilters={panelFilters}
           onApply={handleApplyFilters}
           onClose={() => setShowFilters(false)}
           activeCount={activeFilterCount}
