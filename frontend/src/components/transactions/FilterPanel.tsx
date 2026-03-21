@@ -10,18 +10,21 @@ interface FilterRow {
   value?: string
 }
 
+type AppliedFilters = {
+  date_from?: string
+  date_to?: string
+  category?: string
+  bank_id?: string
+  mode?: string
+  type?: string
+}
+
 interface FilterPanelProps {
   categories: string[]
   modes: string[]
   banks: { id: string; name: string }[]
-  onApply: (filters: {
-    date_from?: string
-    date_to?: string
-    category?: string
-    bank_id?: string
-    mode?: string
-    type?: string
-  }) => void
+  initialFilters?: AppliedFilters
+  onApply: (filters: AppliedFilters) => void
   onClose: () => void
   activeCount: number
 }
@@ -34,8 +37,18 @@ const FIELD_LABELS: Record<FieldKey, string> = {
   type: 'Type',
 }
 
-export default function FilterPanel({ categories, modes, banks, onApply, onClose, activeCount }: FilterPanelProps) {
-  const [rows, setRows] = useState<FilterRow[]>([{ field: 'category' }])
+function filtersToRows(f: AppliedFilters): FilterRow[] {
+  const rows: FilterRow[] = []
+  if (f.date_from || f.date_to) rows.push({ field: 'date_range', from: f.date_from, to: f.date_to })
+  if (f.category) rows.push({ field: 'category', value: f.category })
+  if (f.bank_id) rows.push({ field: 'bank', value: f.bank_id })
+  if (f.mode) rows.push({ field: 'mode', value: f.mode })
+  if (f.type) rows.push({ field: 'type', value: f.type })
+  return rows.length > 0 ? rows : [{ field: 'category' }]
+}
+
+export default function FilterPanel({ categories, modes, banks, initialFilters, onApply, onClose, activeCount }: FilterPanelProps) {
+  const [rows, setRows] = useState<FilterRow[]>(() => filtersToRows(initialFilters ?? {}))
 
   function addRow() {
     setRows(r => [...r, { field: 'category' }])

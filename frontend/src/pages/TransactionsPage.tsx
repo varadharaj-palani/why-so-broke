@@ -385,6 +385,7 @@ export default function TransactionsPage() {
           categories={categories}
           modes={modes}
           banks={banks}
+          initialFilters={filters}
           onApply={handleApplyFilters}
           onClose={() => setShowFilters(false)}
           activeCount={activeFilterCount}
