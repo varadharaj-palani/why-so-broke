@@ -4,6 +4,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
+from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
@@ -17,19 +18,18 @@ router = APIRouter(prefix="/budgets", tags=["budgets"])
 
 @router.get("", response_model=list[BudgetOut])
 async def list_budgets(
-    start_date: date = Query(..., description="Cycle start date"),
-    end_date: date = Query(..., description="Cycle end date"),
+    start_date: date | None = Query(None, description="Filter: budgets overlapping on or after this date"),
+    end_date: date | None = Query(None, description="Filter: budgets overlapping on or before this date"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    conditions = [Budget.user_id == current_user.id]
+    if start_date is not None:
+        conditions.append(Budget.end_date >= start_date)
+    if end_date is not None:
+        conditions.append(Budget.start_date <= end_date)
     result = await db.execute(
-        select(Budget)
-        .where(
-            Budget.user_id == current_user.id,
-            Budget.start_date >= start_date,
-            Budget.end_date <= end_date,
-        )
-        .order_by(Budget.category)
+        select(Budget).where(*conditions).order_by(Budget.category)
     )
     return result.scalars().all()
 
@@ -49,7 +49,11 @@ async def create_budget(
         amount=body.amount,
     )
     db.add(budget)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="A budget for this category and start date already exists.")
     await activity_service.log(
         db, current_user.id, "budget_set", "budget", budget.id,
         {
