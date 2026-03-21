@@ -14,23 +14,37 @@ export const TYPE_COLORS: Record<string, string> = {
   transfer: 'text-blue-600',
 }
 
-export const CATEGORY_COLORS: Record<string, string> = {
-  'Food & Dining': '#f97316',
-  'Groceries': '#84cc16',
-  'Transport': '#06b6d4',
-  'Fuel': '#eab308',
-  'Rent': '#8b5cf6',
-  'Utilities': '#64748b',
-  'Shopping': '#ec4899',
-  'Entertainment': '#a855f7',
-  'Health': '#ef4444',
-  'Education': '#3b82f6',
-  'Subscriptions': '#14b8a6',
-  'Insurance': '#f59e0b',
-  'EMI/Loans': '#dc2626',
-  'Investments': '#22c55e',
-  'Salary': '#10b981',
-  'Freelance': '#6366f1',
-  'Transfers': '#94a3b8',
-  'Other': '#9ca3af',
+// Color palettes for category chips — assigned deterministically by name hash
+// so any new DB category automatically gets a consistent color without hardcoding.
+const CHIP_PALETTES = [
+  { bg: '#e6f1fb', border: '#b5d4f4', text: '#0C447C' },
+  { bg: '#faeeda', border: '#fac775', text: '#633806' },
+  { bg: '#fbeaf0', border: '#f4c0d1', text: '#72243E' },
+  { bg: '#eeedfe', border: '#afa9ec', text: '#3C3489' },
+  { bg: '#e1f5ee', border: '#9FE1CB', text: '#085041' },
+  { bg: '#eaf3de', border: '#c0dd97', text: '#27500A' },
+  { bg: '#f1efe8', border: '#d3d1c7', text: '#444441' },
+  { bg: '#fcebeb', border: '#f7c1c1', text: '#791F1F' },
+]
+
+// Solid chart fill colors — same deterministic approach
+const CHART_COLORS = [
+  '#6b7fa3', '#8b9fbe', '#7a9e8a', '#a09070', '#8888aa',
+  '#7ab8a0', '#b07a8a', '#9090c0', '#a0b07a', '#c09060',
+]
+
+function hashString(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) & 0xffffffff
+  }
+  return Math.abs(hash)
+}
+
+export function getCategoryChip(name: string) {
+  return CHIP_PALETTES[hashString(name) % CHIP_PALETTES.length]
+}
+
+export function getCategoryColor(name: string): string {
+  return CHART_COLORS[hashString(name) % CHART_COLORS.length]
 }

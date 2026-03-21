@@ -3,19 +3,130 @@ import { unverifiedApi } from '../api/imports'
 import { categoriesApi } from '../api/categories'
 import { modesApi } from '../api/modes'
 import { UnverifiedTransaction } from '../types'
-import { formatAmount, formatDate } from '../utils/formatters'
-import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { formatAmount } from '../utils/formatters'
+import { XMarkIcon } from '@heroicons/react/24/outline'
+import api from '../api/client'
+
+// ─── Review Modal ─────────────────────────────────────────────────────────────
+
+function ReviewModal({
+  item,
+  categories,
+  modes,
+  banks,
+  onClose,
+  onDiscard,
+  onConfirm,
+}: {
+  item: UnverifiedTransaction
+  categories: string[]
+  modes: string[]
+  banks: { id: string; name: string }[]
+  onClose: () => void
+  onDiscard: () => void
+  onConfirm: (data: Partial<UnverifiedTransaction>) => void
+}) {
+  const [form, setForm] = useState({
+    description: item.description || '',
+    amount: item.amount || '',
+    category: item.category || (categories[0] ?? ''),
+    mode: item.mode || (modes[0] ?? ''),
+    bank_id: item.bank_id || '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
+  const fiStyle = { background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }
+  const field = (label: string, child: React.ReactNode) => (
+    <div className="mb-3.5">
+      <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>{label}</label>
+      {child}
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.4)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="rounded-xl border p-6 w-[460px] max-w-[94vw]" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-[16px] font-medium" style={{ color: 'var(--text)' }}>Review: {(item.description || item.raw_text || '').slice(0, 30)}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}>
+            <XMarkIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {item.raw_text && (
+          <p className="text-[11px] font-mono mb-4 truncate" style={{ color: 'var(--text3)' }}>{item.raw_text}</p>
+        )}
+
+        {field('Name', <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={fi} style={fiStyle} />)}
+        {field('Amount', <input type="text" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={fi} style={fiStyle} />)}
+        <div className="grid grid-cols-2 gap-3">
+          {field('Category', (
+            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={fi} style={fiStyle}>
+              <option value="">Select…</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          ))}
+          {field('Payment mode', (
+            <select value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value })} className={fi} style={fiStyle}>
+              {modes.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          ))}
+        </div>
+        {field('Bank', (
+          <select value={form.bank_id} onChange={e => setForm({ ...form, bank_id: e.target.value })} className={fi} style={fiStyle}>
+            <option value="">Select bank…</option>
+            {banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        ))}
+
+        <div className="flex gap-2 mt-2">
+          <button onClick={onClose} className="flex-1 py-2 rounded-md text-[13px] border" style={{ borderColor: 'var(--border2)', color: 'var(--text2)', background: 'var(--surface)' }}>
+            Cancel
+          </button>
+          <button onClick={onDiscard} className="flex-1 py-2 rounded-md text-[13px]" style={{ background: 'var(--al)', color: 'var(--amber)', border: '0.5px solid var(--amber)' }}>
+            Discard
+          </button>
+          <button
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true)
+              await onConfirm(form)
+              setSaving(false)
+            }}
+            className="flex-1 py-2 rounded-md text-[13px] text-white disabled:opacity-50"
+            style={{ background: 'var(--green)' }}
+          >
+            {saving ? 'Saving…' : 'Confirm & save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Tag Chip ─────────────────────────────────────────────────────────────────
+
+function Tag({ label }: { label: string }) {
+  return (
+    <span className="text-[11px] px-2.5 py-1 rounded-full border" style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text2)' }}>
+      {label}
+    </span>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function UnverifiedPage() {
   const [items, setItems] = useState<UnverifiedTransaction[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [editId, setEditId] = useState<string | null>(null)
-  const [editData, setEditData] = useState<Partial<UnverifiedTransaction>>({})
-  const [working, setWorking] = useState<string | null>(null)
+  const [reviewItem, setReviewItem] = useState<UnverifiedTransaction | null>(null)
+  const [working, setWorking] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
   const [modes, setModes] = useState<string[]>([])
+  const [banks, setBanks] = useState<{ id: string; name: string }[]>([])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -33,158 +144,130 @@ export default function UnverifiedPage() {
   useEffect(() => {
     categoriesApi.list().then(r => setCategories(r.data.map(c => c.name)))
     modesApi.list().then(r => setModes(r.data.map(m => m.name)))
+    api.get('/banks').then(r => setBanks(r.data))
   }, [])
 
-  const toggle = (id: string) => setSelected(s => {
-    const n = new Set(s)
-    n.has(id) ? n.delete(id) : n.add(id)
-    return n
-  })
-
   const handleVerify = async (id: string) => {
-    setWorking(id)
-    try {
-      await unverifiedApi.verify(id)
-      setItems(items => items.filter(i => i.id !== id))
-    } finally {
-      setWorking(null)
-    }
+    await unverifiedApi.verify(id)
+    setItems(i => i.filter(x => x.id !== id))
+    setTotal(t => t - 1)
   }
 
   const handleReject = async (id: string) => {
-    setWorking(id)
-    try {
-      await unverifiedApi.reject(id)
-      setItems(items => items.filter(i => i.id !== id))
-    } finally {
-      setWorking(null)
-    }
+    await unverifiedApi.reject(id)
+    setItems(i => i.filter(x => x.id !== id))
+    setTotal(t => t - 1)
   }
 
-  const handleBulkVerify = async () => {
-    setWorking('bulk')
+  const handleApproveAll = async () => {
+    setWorking(true)
     try {
-      await unverifiedApi.bulkVerify(Array.from(selected))
+      await unverifiedApi.bulkVerify(items.map(i => i.id))
       await fetchData()
-      setSelected(new Set())
     } finally {
-      setWorking(null)
+      setWorking(false)
     }
   }
 
-  const handleBulkReject = async () => {
-    setWorking('bulk-reject')
-    try {
-      await unverifiedApi.bulkReject(Array.from(selected))
-      await fetchData()
-      setSelected(new Set())
-    } finally {
-      setWorking(null)
-    }
+  const handleConfirm = async (data: Partial<UnverifiedTransaction>) => {
+    if (!reviewItem) return
+    await unverifiedApi.update(reviewItem.id, data)
+    await handleVerify(reviewItem.id)
+    setReviewItem(null)
   }
 
-  const saveEdit = async (id: string) => {
-    await unverifiedApi.update(id, editData)
-    setItems(items => items.map(i => i.id === id ? { ...i, ...editData } : i))
-    setEditId(null)
-    setEditData({})
+  const handleDiscard = async () => {
+    if (!reviewItem) return
+    await handleReject(reviewItem.id)
+    setReviewItem(null)
   }
-
-  const cls = "border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 w-full"
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Unverified</h2>
-          <p className="text-sm text-gray-500">{total} pending from imports</p>
+          <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Unverified</h2>
+          <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>
+            {total > 0 ? `${total} pending — click to review and confirm` : 'No pending transactions'}
+          </p>
         </div>
-        {selected.size > 0 && (
-          <div className="flex gap-2">
-            <button onClick={handleBulkVerify} disabled={!!working} className="bg-green-600 text-white rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-green-700 disabled:opacity-50">
-              Verify {selected.size}
-            </button>
-            <button onClick={handleBulkReject} disabled={!!working} className="bg-red-100 text-red-700 rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-red-200 disabled:opacity-50">
-              Reject {selected.size}
-            </button>
-          </div>
+        {items.length > 0 && (
+          <button
+            onClick={handleApproveAll}
+            disabled={working}
+            className="px-3 py-1.5 rounded-md text-[13px] text-white disabled:opacity-50"
+            style={{ background: 'var(--green)' }}
+          >
+            {working ? 'Approving…' : 'Approve all'}
+          </button>
         )}
       </div>
 
       {loading ? (
         <div className="space-y-2">
-          {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}
+          {[1, 2, 3].map(i => <div key={i} className="h-24 rounded-xl animate-pulse" style={{ background: 'var(--border)' }} />)}
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-xl p-12 text-center shadow-sm border border-gray-100">
-          <p className="text-gray-400">No pending transactions. Import a PDF to get started.</p>
+        <div className="py-12 text-center rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <p className="text-[13px]" style={{ color: 'var(--text3)' }}>No pending transactions. Import a PDF to get started.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {items.map((item) => {
-            const isEditing = editId === item.id
-            const confidence = parseFloat(item.confidence || '1')
-            const lowConfidence = confidence < 0.7
-            return (
-              <div key={item.id} className={`border-b border-gray-100 last:border-0 p-4 ${lowConfidence ? 'bg-yellow-50' : ''}`}>
-                <div className="flex items-start gap-3">
-                  <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} className="mt-1 w-4 h-4 accent-green-600" />
-                  <div className="flex-1 min-w-0">
-                    {isEditing ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-                        <input type="date" defaultValue={item.date || ''} onChange={e => setEditData(d => ({...d, date: e.target.value}))} className={cls} />
-                        <input type="text" defaultValue={item.description || ''} onChange={e => setEditData(d => ({...d, description: e.target.value}))} className={cls} placeholder="Description" />
-                        <select defaultValue={item.category || ''} onChange={e => setEditData(d => ({...d, category: e.target.value}))} className={cls}>
-                          {categories.map(c => <option key={c}>{c}</option>)}
-                        </select>
-                        <input type="number" step="0.01" defaultValue={item.amount || ''} onChange={e => setEditData(d => ({...d, amount: e.target.value}))} className={cls} placeholder="Amount" />
-                        <select defaultValue={item.mode || ''} onChange={e => setEditData(d => ({...d, mode: e.target.value}))} className={cls}>
-                          {modes.map(m => <option key={m}>{m}</option>)}
-                        </select>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-gray-900 truncate">{item.description}</p>
-                          {lowConfidence && <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">Low confidence</span>}
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {item.date ? formatDate(item.date) : '?'} · {item.category} · {item.mode}
-                        </p>
-                        {item.raw_text && (
-                          <p className="text-xs text-gray-400 mt-1 truncate font-mono">{item.raw_text}</p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    {!isEditing && (
-                      <p className="text-sm font-semibold text-gray-900">{item.amount ? formatAmount(item.amount) : '—'}</p>
-                    )}
-                    <div className="flex gap-1 mt-1 justify-end">
-                      {isEditing ? (
-                        <>
-                          <button onClick={() => saveEdit(item.id)} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">Save</button>
-                          <button onClick={() => { setEditId(null); setEditData({}) }} className="text-xs border border-gray-300 px-2 py-1 rounded hover:bg-gray-50">Cancel</button>
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={() => { setEditId(item.id); setEditData({}) }} className="text-xs text-blue-600 hover:underline">Edit</button>
-                          <button onClick={() => handleVerify(item.id)} disabled={working === item.id} className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50">
-                            <CheckIcon className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleReject(item.id)} disabled={working === item.id} className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50">
-                            <XMarkIcon className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+        <div className="space-y-2.5">
+          {items.map(item => (
+            <div
+              key={item.id}
+              onClick={() => setReviewItem(item)}
+              className="rounded-xl border p-4 cursor-pointer transition-all"
+              style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'var(--green)'
+                e.currentTarget.style.background = 'var(--gl)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'var(--border)'
+                e.currentTarget.style.background = 'var(--surface)'
+              }}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <p className="text-[14px] font-medium" style={{ color: 'var(--text)' }}>{item.description || item.raw_text?.slice(0, 40) || '—'}</p>
+                  {item.raw_text && (
+                    <p className="text-[11px] font-mono mt-0.5 truncate max-w-[300px]" style={{ color: 'var(--text3)' }}>{item.raw_text}</p>
+                  )}
                 </div>
+                <span className="text-[16px] font-medium flex-shrink-0 ml-4" style={{ color: 'var(--text)' }}>
+                  {item.amount ? formatAmount(item.amount) : '—'}
+                </span>
               </div>
-            )
-          })}
+              <div className="flex gap-1.5 flex-wrap mt-2">
+                <Tag label={item.category || 'Category not set'} />
+                {item.mode && <Tag label={item.mode} />}
+                {item.bank && <Tag label={item.bank.name} />}
+              </div>
+              <p className="text-[11px] mt-2 flex items-center gap-1" style={{ color: 'var(--text3)' }}>
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                  <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+                  <path d="M7 4.5v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  <circle cx="7" cy="9.5" r=".6" fill="currentColor" />
+                </svg>
+                Click to set category and confirm
+              </p>
+            </div>
+          ))}
         </div>
+      )}
+
+      {reviewItem && (
+        <ReviewModal
+          item={reviewItem}
+          categories={categories}
+          modes={modes}
+          banks={banks}
+          onClose={() => setReviewItem(null)}
+          onDiscard={handleDiscard}
+          onConfirm={handleConfirm}
+        />
       )}
     </div>
   )

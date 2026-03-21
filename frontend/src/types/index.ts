@@ -93,7 +93,9 @@ export interface ModeItem {
 export interface Budget {
   id: string
   category: string
-  month: string
+  month: string | null
+  start_date: string | null
+  end_date: string | null
   amount: string
   created_at: string
   updated_at: string
@@ -104,6 +106,13 @@ export interface BudgetProgress {
   budget_amount: string
   spent_amount: string
   percentage: number
+  start_date?: string | null
+  end_date?: string | null
+}
+
+export interface DailySpendItem {
+  date: string
+  total: string
 }
 
 export interface Summary {
@@ -153,4 +162,5 @@ export interface Filters {
   bank_id?: string
   mode?: string
   type?: string
+  description?: string
 }
