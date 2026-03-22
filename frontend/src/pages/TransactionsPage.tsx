@@ -434,7 +434,7 @@ export default function TransactionsPage() {
           {yearMonths.map(({ month, label, count, total }) => (
             <div
               key={month}
-              onClick={() => { setDrillMonth(month); setView('3months') }}
+              onClick={() => setDrillMonth(month)}
               className="flex items-center gap-3 px-3.5 py-2.5 border rounded-md cursor-pointer transition-colors"
               style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border2)')}
