@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Bank } from '../../types'
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import DropdownMenu from '../ui/DropdownMenu'
+import ConfirmModal from '../ui/ConfirmModal'
 import api from '../../api/client'
 
 export default function BanksPanel() {
@@ -11,6 +12,7 @@ export default function BanksPanel() {
   const [editId, setEditId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editCode, setEditCode] = useState('')
+  const [archiveId, setArchiveId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -42,12 +44,13 @@ export default function BanksPanel() {
   }
 
   async function archiveBank(id: string) {
-    if (!window.confirm('Archive this bank? It will be hidden from dropdowns but your transaction history is preserved.')) return
     try {
       await api.delete(`/banks/${id}`)
       setBanks(b => b.filter(x => x.id !== id))
+      setArchiveId(null)
     } catch (err: unknown) {
       setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot archive bank')
+      setArchiveId(null)
     }
   }
 
@@ -130,7 +133,7 @@ export default function BanksPanel() {
                     },
                     {
                       label: 'Archive',
-                      onClick: () => archiveBank(bank.id),
+                      onClick: () => setArchiveId(bank.id),
                       variant: 'danger',
                     },
                   ]}
@@ -170,6 +173,15 @@ export default function BanksPanel() {
       </div>
 
       {error && <p className="mt-2 text-[12px] text-red-500">{error}</p>}
+
+      <ConfirmModal
+        open={archiveId !== null}
+        title="Archive bank?"
+        description="This bank will be hidden from dropdowns. Your transaction history is preserved."
+        confirmLabel="Archive"
+        onConfirm={() => archiveId && archiveBank(archiveId)}
+        onCancel={() => setArchiveId(null)}
+      />
     </div>
   )
 }
