@@ -3,6 +3,7 @@ import { modesApi, ModeItem } from '../../api/modes'
 import { getCategoryChip } from '../../utils/constants'
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import DropdownMenu from '../ui/DropdownMenu'
+import { Toast, useToast } from '../ui/Toast'
 
 export default function ModesPanel() {
   const [modes, setModes] = useState<ModeItem[]>([])
@@ -10,6 +11,7 @@ export default function ModesPanel() {
   const [editId, setEditId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [error, setError] = useState('')
+  const { toast, showToast, clearToast } = useToast()
 
   useEffect(() => {
     modesApi.list().then(r => setModes(r.data))
@@ -44,7 +46,7 @@ export default function ModesPanel() {
       await modesApi.delete(id)
       setModes(m => m.filter(x => x.id !== id))
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete mode')
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete mode', 'error')
     }
   }
 
@@ -148,6 +150,7 @@ export default function ModesPanel() {
       </div>
 
       {error && <p className="mt-2 text-[12px] text-red-500">{error}</p>}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
     </div>
   )
 }

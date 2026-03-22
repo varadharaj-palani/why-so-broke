@@ -3,6 +3,7 @@ import { categoriesApi, CategoryItem } from '../../api/categories'
 import { getCategoryChip } from '../../utils/constants'
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import DropdownMenu from '../ui/DropdownMenu'
+import { Toast, useToast } from '../ui/Toast'
 
 export default function CategoriesPanel() {
   const [categories, setCategories] = useState<CategoryItem[]>([])
@@ -10,6 +11,7 @@ export default function CategoriesPanel() {
   const [editId, setEditId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [error, setError] = useState('')
+  const { toast, showToast, clearToast } = useToast()
 
   useEffect(() => {
     categoriesApi.list().then(r => setCategories(r.data))
@@ -44,7 +46,7 @@ export default function CategoriesPanel() {
       await categoriesApi.delete(id)
       setCategories(c => c.filter(x => x.id !== id))
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete category')
+      showToast((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete category', 'error')
     }
   }
 
@@ -125,6 +127,7 @@ export default function CategoriesPanel() {
       </div>
 
       {error && <p className="mt-2 text-[12px] text-red-500">{error}</p>}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
     </div>
   )
 }
