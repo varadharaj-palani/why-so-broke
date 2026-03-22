@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.transaction import Transaction
 from app.models.category import Category
 from app.models.mode import Mode
+from app.models.bank import Bank
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionOut, TransactionListResponse
 from app.services import activity_service
 
@@ -45,6 +46,14 @@ async def _validate_category(db: AsyncSession, user_id: uuid.UUID, category: str
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=422, detail=f"Invalid category: {category}")
+
+
+async def _bank_name(db: AsyncSession, bank_id: uuid.UUID | None) -> str | None:
+    if not bank_id:
+        return None
+    result = await db.execute(select(Bank).where(Bank.id == bank_id))
+    bank = result.scalar_one_or_none()
+    return bank.name if bank else None
 
 
 async def _validate_mode(db: AsyncSession, user_id: uuid.UUID, mode: str) -> None:
@@ -131,7 +140,17 @@ async def create_transaction(
         db.add(tx1)
         db.add(tx2)
         await db.flush()
-        await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx1.id)
+        bank_name = await _bank_name(db, body.bank_id)
+        to_bank_name = await _bank_name(db, body.transfer_to_bank_id)
+        await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx1.id, {
+            "description": body.description,
+            "amount": float(body.amount),
+            "category": body.category,
+            "bank_name": bank_name,
+            "to_bank_name": to_bank_name,
+            "mode": body.mode,
+            "type": body.type,
+        })
         await db.commit()
         result = await db.execute(
             select(Transaction)
@@ -148,7 +167,15 @@ async def create_transaction(
         )
         db.add(tx)
         await db.flush()
-        await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx.id)
+        bank_name = await _bank_name(db, body.bank_id)
+        await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx.id, {
+            "description": body.description,
+            "amount": float(body.amount),
+            "category": body.category,
+            "bank_name": bank_name,
+            "mode": body.mode,
+            "type": body.type,
+        })
         await db.commit()
         result = await db.execute(
             select(Transaction)

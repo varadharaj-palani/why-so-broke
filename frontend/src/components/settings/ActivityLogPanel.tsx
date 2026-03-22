@@ -51,6 +51,18 @@ function getDetailLines(item: ActivityItem): { line1?: string; line2?: string } 
   const d = item.details
   if (!d) return {}
 
+  if (item.action === 'transaction_created' || item.action === 'transaction_updated') {
+    const desc = d.description ? String(d.description) : ''
+    const amt = d.amount != null ? `₹${Number(d.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : ''
+    const category = d.category ? String(d.category) : ''
+    const bank = d.bank_name ? String(d.bank_name) : ''
+    const mode = d.mode ? String(d.mode) : ''
+    return {
+      line1: [desc, amt].filter(Boolean).join(' · ') || undefined,
+      line2: [category, bank, mode].filter(Boolean).join(' · ') || undefined,
+    }
+  }
+
   if (item.action === 'budget_set') {
     const category = String(d.category ?? '')
     const amt = d.amount != null ? Number(d.amount).toLocaleString('en-IN') : ''
