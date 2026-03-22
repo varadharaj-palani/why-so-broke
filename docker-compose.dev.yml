@@ -9,7 +9,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-tracker}:${DB_PASSWORD:-tracker_dev}@db:5432/why_so_broke
       DATABASE_SYNC_URL: postgresql+psycopg2://${DB_USER:-tracker}:${DB_PASSWORD:-tracker_dev}@db:5432/why_so_broke
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-prod}
-      LLM_PROVIDER: ${LLM_PROVIDER:-claude}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
 
