@@ -146,7 +146,7 @@ export default function DashboardPage() {
           {byMode.length === 0 ? <EmptyChart /> : (
             <ResponsiveContainer width="100%" height={130}>
               <PieChart>
-                <Pie data={byMode} dataKey="total" nameKey="mode" cx="50%" cy="50%" innerRadius={35} outerRadius={55} animationDuration={300}>
+                <Pie data={byMode.map(m => ({ ...m, total: parseFloat(m.total) }))} dataKey="total" nameKey="mode" cx="50%" cy="50%" innerRadius={35} outerRadius={55} animationDuration={300}>
                   {byMode.map((entry, i) => (
                     <Cell key={entry.mode} fill={getCategoryColor(entry.mode)} />
                   ))}
