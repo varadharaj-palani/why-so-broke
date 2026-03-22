@@ -29,7 +29,8 @@ export default function DropdownMenu({ items }: DropdownMenuProps) {
     <div className="relative" ref={ref}>
       <button
         onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
-        className="w-7 h-7 flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--bg)] text-[var(--text3)] hover:border-[var(--border2)] hover:text-[var(--text2)] transition-colors"
+        className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text3)] hover:text-[var(--text2)] transition-colors"
+        style={{ background: 'none', border: 'none' }}
       >
         <EllipsisVerticalIcon className="w-4 h-4" />
       </button>
