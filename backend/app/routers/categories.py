@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
+from app.models.budget import Budget
 from app.models.category import Category
 from app.models.transaction import Transaction
 from app.constants import CATEGORIES
@@ -117,15 +118,30 @@ async def delete_category(
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    count_result = await db.execute(
+    tx_count_result = await db.execute(
         select(func.count()).select_from(Transaction).where(
             Transaction.user_id == current_user.id,
             Transaction.category == cat.name,
         )
     )
-    count = count_result.scalar_one()
-    if count > 0:
-        raise HTTPException(status_code=400, detail=f"Cannot delete: used in {count} transaction(s)")
+    tx_count = tx_count_result.scalar_one()
+
+    budget_count_result = await db.execute(
+        select(func.count()).select_from(Budget).where(
+            Budget.user_id == current_user.id,
+            Budget.category == cat.name,
+        )
+    )
+    budget_count = budget_count_result.scalar_one()
+
+    parts = []
+    if tx_count > 0:
+        parts.append(f"{tx_count} transaction(s)")
+    if budget_count > 0:
+        parts.append(f"{budget_count} budget(s)")
+    if parts:
+        raise HTTPException(status_code=400, detail=f"Cannot delete: used in {', '.join(parts)}")
+    count = tx_count
 
     details = {"name": cat.name, "transaction_count": count}
     await db.delete(cat)

@@ -55,6 +55,7 @@ const ACTION_LABELS: Record<string, string> = {
   bank_created: 'Bank added',
   bank_updated: 'Bank updated',
   bank_deleted: 'Bank removed',
+  bank_archived: 'Bank archived',
   category_created: 'Category added',
   category_updated: 'Category renamed',
   category_deleted: 'Category removed',
@@ -105,7 +106,7 @@ function getDetailLines(item: ActivityItem): { line1?: string; line2?: string } 
     return { line1: filename || undefined, line2: rows || undefined }
   }
 
-  if (item.action === 'bank_created' || item.action === 'bank_updated' || item.action === 'bank_deleted') {
+  if (item.action === 'bank_created' || item.action === 'bank_updated' || item.action === 'bank_deleted' || item.action === 'bank_archived') {
     const name = String(d.name ?? '')
     const code = d.short_code ? `Code: ${d.short_code}` : ''
     return { line1: name || undefined, line2: code || undefined }

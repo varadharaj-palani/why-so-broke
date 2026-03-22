@@ -19,6 +19,7 @@ class BankOut(BaseModel):
     name: str
     short_code: str | None
     is_active: bool
+    is_archived: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

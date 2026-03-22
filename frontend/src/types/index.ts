@@ -10,6 +10,7 @@ export interface Bank {
   name: string
   short_code: string | null
   is_active: boolean
+  is_archived: boolean
   created_at: string
 }
 

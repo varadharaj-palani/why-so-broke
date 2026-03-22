@@ -18,7 +18,7 @@ async def list_banks(
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(Bank).where(Bank.user_id == current_user.id).order_by(Bank.name)
+        select(Bank).where(Bank.user_id == current_user.id, Bank.is_archived == False).order_by(Bank.name)
     )
     return result.scalars().all()
 
@@ -81,8 +81,10 @@ async def delete_bank(
     if not bank:
         raise HTTPException(status_code=404, detail="Bank not found")
 
-    details = {"name": bank.name, "short_code": bank.short_code}
-    await db.delete(bank)
+    bank.is_archived = True
     await db.flush()
-    await activity_service.log(db, current_user.id, "bank_deleted", "settings", bank_id, details)
+    await activity_service.log(db, current_user.id, "bank_archived", "settings", bank_id, {
+        "name": bank.name,
+        "short_code": bank.short_code,
+    })
     await db.commit()

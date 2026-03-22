@@ -41,12 +41,13 @@ export default function BanksPanel() {
     }
   }
 
-  async function deleteBank(id: string) {
+  async function archiveBank(id: string) {
+    if (!window.confirm('Archive this bank? It will be hidden from dropdowns but your transaction history is preserved.')) return
     try {
       await api.delete(`/banks/${id}`)
       setBanks(b => b.filter(x => x.id !== id))
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot delete bank')
+      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Cannot archive bank')
     }
   }
 
@@ -128,8 +129,8 @@ export default function BanksPanel() {
                       onClick: () => { setEditId(bank.id); setEditName(bank.name); setEditCode(bank.short_code || '') },
                     },
                     {
-                      label: 'Delete',
-                      onClick: () => deleteBank(bank.id),
+                      label: 'Archive',
+                      onClick: () => archiveBank(bank.id),
                       variant: 'danger',
                     },
                   ]}
