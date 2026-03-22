@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { Filters } from '../types'
+import dayjs from 'dayjs'
 
 interface FilterStore {
   filters: Filters
@@ -8,8 +9,14 @@ interface FilterStore {
   clearFilters: () => void
 }
 
+const today = dayjs()
+const defaultFilters: Filters = {
+  date_from: today.startOf('month').format('YYYY-MM-DD'),
+  date_to: today.format('YYYY-MM-DD'),
+}
+
 export const useFilterStore = create<FilterStore>((set) => ({
-  filters: {},
+  filters: defaultFilters,
   setFilter: (key, value) =>
     set((state) => ({
       filters: { ...state.filters, [key]: value || undefined },
