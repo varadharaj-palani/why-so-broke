@@ -7,6 +7,7 @@ from app.deps import get_current_user
 from app.models.user import User
 from app.models.bank import Bank
 from app.schemas.bank import BankCreate, BankUpdate, BankOut
+from app.services import activity_service
 
 router = APIRouter(prefix="/banks", tags=["banks"])
 
@@ -30,6 +31,11 @@ async def create_bank(
 ):
     bank = Bank(user_id=current_user.id, name=body.name, short_code=body.short_code)
     db.add(bank)
+    await db.flush()
+    await activity_service.log(db, current_user.id, "bank_created", "settings", bank.id, {
+        "name": body.name,
+        "short_code": body.short_code,
+    })
     await db.commit()
     await db.refresh(bank)
     return bank
@@ -52,6 +58,11 @@ async def update_bank(
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(bank, field, value)
 
+    await db.flush()
+    await activity_service.log(db, current_user.id, "bank_updated", "settings", bank.id, {
+        "name": bank.name,
+        "short_code": bank.short_code,
+    })
     await db.commit()
     await db.refresh(bank)
     return bank
@@ -69,5 +80,9 @@ async def delete_bank(
     bank = result.scalar_one_or_none()
     if not bank:
         raise HTTPException(status_code=404, detail="Bank not found")
+
+    details = {"name": bank.name, "short_code": bank.short_code}
     await db.delete(bank)
+    await db.flush()
+    await activity_service.log(db, current_user.id, "bank_deleted", "settings", bank_id, details)
     await db.commit()

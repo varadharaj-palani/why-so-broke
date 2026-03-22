@@ -37,14 +37,34 @@ function getIconCfg(action: string, entityType: string | null): IconCfg {
   if (action.startsWith('transaction_')) return { icon: PencilSquareIcon, bg: 'var(--al)', color: 'var(--amber)' }
   if (action.startsWith('budget_') || entityType === 'budget') return { icon: BanknotesIcon, bg: '#ede9fe', color: '#7c3aed' }
   if (entityType === 'import_job' || action.includes('import')) return { icon: ArrowDownTrayIcon, bg: '#dbeafe', color: '#2563eb' }
-  if (action.includes('bank')) return { icon: BuildingLibraryIcon, bg: '#ccfbf1', color: '#0d9488' }
+  if (action.startsWith('bank_')) return { icon: BuildingLibraryIcon, bg: '#ccfbf1', color: '#0d9488' }
+  if (action.startsWith('category_')) return { icon: TagIcon, bg: '#ccfbf1', color: '#0d9488' }
+  if (action.startsWith('mode_')) return { icon: BanknotesIcon, bg: '#ede9fe', color: '#7c3aed' }
   return { icon: TagIcon, bg: '#f1f5f9', color: '#64748b' }
 }
 
 // ─── Label + detail parsing ────────────────────────────────────────────────────
 
+const ACTION_LABELS: Record<string, string> = {
+  transaction_created: 'Transaction created',
+  transaction_updated: 'Transaction edited',
+  budget_set: 'Budget created',
+  budget_updated: 'Budget updated',
+  import_started: 'Import started',
+  import_completed: 'Statement imported',
+  bank_created: 'Bank added',
+  bank_updated: 'Bank updated',
+  bank_deleted: 'Bank removed',
+  category_created: 'Category added',
+  category_updated: 'Category renamed',
+  category_deleted: 'Category removed',
+  mode_created: 'Payment mode added',
+  mode_updated: 'Payment mode updated',
+  mode_deleted: 'Payment mode removed',
+}
+
 function actionLabel(action: string): string {
-  return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  return ACTION_LABELS[action] ?? action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
 function getDetailLines(item: ActivityItem): { line1?: string; line2?: string } {
@@ -79,21 +99,39 @@ function getDetailLines(item: ActivityItem): { line1?: string; line2?: string } 
     }
   }
 
-  if (item.entity_type === 'import_job') {
-    const bank = String(d.bank_name ?? d.bank ?? '')
+  if (item.action === 'import_completed' || item.action === 'import_started') {
+    const filename = d.filename ? String(d.filename) : ''
     const rows = d.total_rows != null ? `${d.total_rows} transactions extracted` : ''
-    const unverified = d.unverified_count != null ? `${d.unverified_count} unverified` : ''
-    return {
-      line1: bank || undefined,
-      line2: [rows, unverified].filter(Boolean).join(' · ') || undefined,
-    }
+    return { line1: filename || undefined, line2: rows || undefined }
   }
 
-  // Generic: show up to 2 key-value pairs
-  const parts = Object.entries(d)
-    .slice(0, 3)
-    .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${String(v)}`)
-  return { line1: parts.slice(0, 2).join(' · '), line2: parts[2] }
+  if (item.action === 'bank_created' || item.action === 'bank_updated' || item.action === 'bank_deleted') {
+    const name = String(d.name ?? '')
+    const code = d.short_code ? `Code: ${d.short_code}` : ''
+    return { line1: name || undefined, line2: code || undefined }
+  }
+
+  if (item.action === 'category_created' || item.action === 'category_deleted') {
+    const name = String(d.name ?? '')
+    const count = d.transaction_count != null ? `Previously used in ${d.transaction_count} transaction(s)` : ''
+    return { line1: name || undefined, line2: count || undefined }
+  }
+
+  if (item.action === 'category_updated') {
+    return { line1: String(d.name ?? ''), line2: d.old_name ? `Renamed from ${d.old_name}` : undefined }
+  }
+
+  if (item.action === 'mode_created' || item.action === 'mode_deleted') {
+    return { line1: String(d.name ?? '') || undefined }
+  }
+
+  if (item.action === 'mode_updated') {
+    return { line1: String(d.name ?? ''), line2: d.old_name ? `Renamed from ${d.old_name}` : undefined }
+  }
+
+  // Generic fallback
+  const parts = Object.entries(d).slice(0, 2).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${String(v)}`)
+  return { line1: parts[0], line2: parts[1] }
 }
 
 // ─── Date group helpers ────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.category import Category
 from app.models.transaction import Transaction
 from app.constants import CATEGORIES
+from app.services import activity_service
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
@@ -61,6 +62,10 @@ async def create_category(
     cat = Category(user_id=current_user.id, name=body.name.strip())
     db.add(cat)
     try:
+        await db.flush()
+        await activity_service.log(db, current_user.id, "category_created", "settings", cat.id, {
+            "name": cat.name,
+        })
         await db.commit()
         await db.refresh(cat)
         return cat
@@ -83,8 +88,14 @@ async def update_category(
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
 
+    old_name = cat.name
     cat.name = body.name.strip()
     try:
+        await db.flush()
+        await activity_service.log(db, current_user.id, "category_updated", "settings", cat.id, {
+            "name": cat.name,
+            "old_name": old_name,
+        })
         await db.commit()
         await db.refresh(cat)
         return cat
@@ -116,5 +127,8 @@ async def delete_category(
     if count > 0:
         raise HTTPException(status_code=400, detail=f"Cannot delete: used in {count} transaction(s)")
 
+    details = {"name": cat.name, "transaction_count": count}
     await db.delete(cat)
+    await db.flush()
+    await activity_service.log(db, current_user.id, "category_deleted", "settings", category_id, details)
     await db.commit()

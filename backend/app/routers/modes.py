@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.mode import Mode
 from app.models.transaction import Transaction
 from app.constants import MODES
+from app.services import activity_service
 
 router = APIRouter(prefix="/modes", tags=["modes"])
 
@@ -61,6 +62,10 @@ async def create_mode(
     mode = Mode(user_id=current_user.id, name=body.name.strip())
     db.add(mode)
     try:
+        await db.flush()
+        await activity_service.log(db, current_user.id, "mode_created", "settings", mode.id, {
+            "name": mode.name,
+        })
         await db.commit()
         await db.refresh(mode)
         return mode
@@ -83,8 +88,14 @@ async def update_mode(
     if not mode:
         raise HTTPException(status_code=404, detail="Mode not found")
 
+    old_name = mode.name
     mode.name = body.name.strip()
     try:
+        await db.flush()
+        await activity_service.log(db, current_user.id, "mode_updated", "settings", mode.id, {
+            "name": mode.name,
+            "old_name": old_name,
+        })
         await db.commit()
         await db.refresh(mode)
         return mode
@@ -116,5 +127,8 @@ async def delete_mode(
     if count > 0:
         raise HTTPException(status_code=400, detail=f"Cannot delete: used in {count} transaction(s)")
 
+    details = {"name": mode.name, "transaction_count": count}
     await db.delete(mode)
+    await db.flush()
+    await activity_service.log(db, current_user.id, "mode_deleted", "settings", mode_id, details)
     await db.commit()
