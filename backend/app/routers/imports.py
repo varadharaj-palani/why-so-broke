@@ -35,17 +35,6 @@ async def upload_statement(
 
     file_hash = compute_hash(file_bytes)
 
-    # Duplicate detection
-    existing = await db.execute(
-        select(ImportJob).where(
-            ImportJob.user_id == current_user.id,
-            ImportJob.file_hash == file_hash,
-            ImportJob.status == "completed",
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="This file has already been imported.")
-
     # Save to temp file
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     tmp.write(file_bytes)

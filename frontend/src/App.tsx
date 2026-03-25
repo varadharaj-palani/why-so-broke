@@ -10,6 +10,8 @@ import ImportPage from './pages/ImportPage'
 import BudgetsPage from './pages/BudgetsPage'
 import SettingsPage from './pages/SettingsPage'
 import AppShell from './components/layout/AppShell'
+import { ToastProvider } from './contexts/ToastContext'
+import { ImportProgressProvider } from './contexts/ImportProgressContext'
 
 function ProtectedRoute() {
   const token = localStorage.getItem('token')
@@ -62,8 +64,12 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <ToastProvider>
+      <ImportProgressProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ImportProgressProvider>
+    </ToastProvider>
   )
 }

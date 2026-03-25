@@ -4,6 +4,8 @@ import { ImportJob } from '../types'
 import { formatDateTime } from '../utils/formatters'
 import { ArrowUpTrayIcon } from '@heroicons/react/24/outline'
 import api from '../api/client'
+import { useToast } from '../contexts/ToastContext'
+import { useImportProgress } from '../contexts/ImportProgressContext'
 
 const STATUS_COLORS: Record<string, string> = {
   processing: 'text-yellow-600 bg-yellow-50',
@@ -28,27 +30,21 @@ export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
-  const [pollingId, setPollingId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const { showToast } = useToast()
+  const { setActiveJobId, activeJobStatus } = useImportProgress()
 
   useEffect(() => {
     importsApi.list().then(r => setJobs(r.data))
     api.get('/banks').then(r => setBanks(r.data))
   }, [])
 
-  // Poll processing job
+  // Refresh job list when active job completes
   useEffect(() => {
-    if (!pollingId) return
-    const interval = setInterval(async () => {
-      const res = await importsApi.get(pollingId)
-      setJobs(jobs => jobs.map(j => j.id === pollingId ? res.data : j))
-      if (!['processing', 'extracting', 'mapping'].includes(res.data.status)) {
-        setPollingId(null)
-        clearInterval(interval)
-      }
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [pollingId])
+    if (activeJobStatus && !['processing', 'extracting', 'mapping'].includes(activeJobStatus)) {
+      importsApi.list().then(r => setJobs(r.data))
+    }
+  }, [activeJobStatus])
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault()
@@ -70,7 +66,8 @@ export default function ImportPage() {
         completed_at: null,
       }
       setJobs(j => [newJob, ...j])
-      setPollingId(res.data.import_job_id)
+      setActiveJobId(res.data.import_job_id)
+      showToast('Import is running in the background — usually ~1-2 min', 'info')
       setFile(null)
       if (fileRef.current) fileRef.current.value = ''
     } catch (err: unknown) {
@@ -102,6 +99,9 @@ export default function ImportPage() {
               borderColor: file ? 'var(--green)' : 'var(--border2)',
             }}
             onClick={() => fileRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--green)'; e.currentTarget.style.background = 'var(--gl)' }}
+            onDragLeave={e => { if (!file) { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.background = 'var(--surface)' } }}
+            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f?.type === 'application/pdf') setFile(f) }}
             onMouseEnter={e => {
               if (!file) {
                 e.currentTarget.style.borderColor = 'var(--green)'
@@ -120,7 +120,7 @@ export default function ImportPage() {
               {file ? file.name : 'Click to upload PDF'}
             </p>
             <p className="text-[12px]" style={{ color: 'var(--text3)' }}>Bank statement · max 10MB</p>
-            <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
+            <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) setFile(f) }} />
           </div>
 
           {/* Bank selector */}

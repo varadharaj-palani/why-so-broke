@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../../api/client'
+import { importsApi } from '../../api/imports'
 import dayjs from 'dayjs'
 import {
   PlusIcon,
@@ -14,6 +15,7 @@ interface ActivityItem {
   id: string
   action: string
   entity_type: string | null
+  entity_id: string | null
   created_at: string
   details: Record<string, unknown> | null
 }
@@ -68,7 +70,7 @@ function actionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-function getDetailLines(item: ActivityItem): { line1?: string; line2?: string } {
+function getDetailLines(item: ActivityItem, isImportInProgress?: boolean): { line1?: string; line2?: string } {
   const d = item.details
   if (!d) return {}
 
@@ -102,6 +104,9 @@ function getDetailLines(item: ActivityItem): { line1?: string; line2?: string } 
 
   if (item.action === 'import_completed' || item.action === 'import_started') {
     const filename = d.filename ? String(d.filename) : ''
+    if (isImportInProgress) {
+      return { line1: filename || undefined, line2: 'Processing... usually ~1-2 min' }
+    }
     const rows = d.total_rows != null ? `${d.total_rows} transactions extracted` : ''
     return { line1: filename || undefined, line2: rows || undefined }
   }
@@ -165,6 +170,8 @@ export default function ActivityLogPanel() {
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState('')
   const [loading, setLoading] = useState(false)
+  const [activeImportIds, setActiveImportIds] = useState<Set<string>>(new Set())
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   async function loadPage(p: number, entityType: string, replace: boolean) {
     setLoading(true)
@@ -175,6 +182,23 @@ export default function ActivityLogPanel() {
       const data = res.data
       setTotal(data.total)
       setItems(prev => replace ? data.items : [...prev, ...data.items])
+
+      // Probe import jobs to find active ones
+      if (replace) {
+        const importItems = data.items.filter((item: ActivityItem) => item.action === 'import_started' && item.entity_id)
+        const activeIds = new Set<string>()
+        for (const item of importItems) {
+          try {
+            const res = await importsApi.get(item.entity_id!)
+            if (['processing', 'extracting', 'mapping'].includes(res.data.status)) {
+              activeIds.add(item.entity_id!)
+            }
+          } catch (err) {
+            console.error('Failed to check import status:', err)
+          }
+        }
+        setActiveImportIds(activeIds)
+      }
     } finally {
       setLoading(false)
     }
@@ -185,6 +209,43 @@ export default function ActivityLogPanel() {
     loadPage(1, filter, true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter])
+
+  // Poll active imports
+  useEffect(() => {
+    if (activeImportIds.size === 0) {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+      return
+    }
+
+    pollingIntervalRef.current = setInterval(async () => {
+      const newActiveIds = new Set<string>()
+      for (const jobId of activeImportIds) {
+        try {
+          const res = await importsApi.get(jobId)
+          if (['processing', 'extracting', 'mapping'].includes(res.data.status)) {
+            newActiveIds.add(jobId)
+          } else {
+            // Job completed/failed - refresh the activity log
+            setPage(1)
+            loadPage(1, filter, true)
+          }
+        } catch (err) {
+          console.error('Failed to poll import job:', err)
+        }
+      }
+      setActiveImportIds(newActiveIds)
+    }, 5000)
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
+  }, [activeImportIds, filter])
 
   function loadMore() {
     const next = page + 1
@@ -248,7 +309,8 @@ export default function ActivityLogPanel() {
                 {group.items.map((item, i) => {
                   const cfg = getIconCfg(item.action, item.entity_type)
                   const Icon = cfg.icon
-                  const { line1, line2 } = getDetailLines(item)
+                  const isImportInProgress = item.action === 'import_started' && item.entity_id ? activeImportIds.has(item.entity_id) : false
+                  const { line1, line2 } = getDetailLines(item, isImportInProgress)
                   const time = dayjs(item.created_at).format('h:mm A')
                   const isLast = i === group.items.length - 1
 
@@ -269,16 +331,20 @@ export default function ActivityLogPanel() {
 
                       {/* Icon circle */}
                       <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 z-10"
+                        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 z-10 ${isImportInProgress ? 'animate-spin' : ''}`}
                         style={{ background: cfg.bg }}
                       >
-                        <Icon className="w-4 h-4" style={{ color: cfg.color }} />
+                        {isImportInProgress ? (
+                          <div className="w-5 h-5 border-2 border-transparent border-t-blue-500 rounded-full" />
+                        ) : (
+                          <Icon className="w-4 h-4" style={{ color: cfg.color }} />
+                        )}
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0 pb-5">
                         <p className="text-[13px] font-semibold leading-snug" style={{ color: 'var(--text)' }}>
-                          {actionLabel(item.action)}
+                          {isImportInProgress ? '⏳ Processing...' : actionLabel(item.action)}
                         </p>
                         {line1 && (
                           <p className="text-[12px] mt-0.5" style={{ color: 'var(--text2)' }}>{line1}</p>
