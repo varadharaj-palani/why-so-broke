@@ -27,6 +27,7 @@ function ReviewModal({
   onConfirm: (data: Partial<UnverifiedTransaction>) => void
 }) {
   const [form, setForm] = useState({
+    date: item.date || '',
     description: item.description || '',
     amount: item.amount || '',
     category: item.category || (categories[0] ?? ''),
@@ -59,6 +60,7 @@ function ReviewModal({
           <p className="text-[11px] font-mono mb-4 truncate" style={{ color: 'var(--text3)' }}>{item.raw_text}</p>
         )}
 
+        {field('Date', <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={fi} style={fiStyle} />)}
         {field('Name', <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={fi} style={fiStyle} />)}
         {field('Amount', <input type="text" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={fi} style={fiStyle} />)}
         <div className="grid grid-cols-2 gap-3">
