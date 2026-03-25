@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from datetime import date as DateType
 from decimal import Decimal
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 from app.constants import TYPES
 
 
@@ -75,7 +75,7 @@ class TransactionOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True, json_encoders={Decimal: float})
 
 
 class TransactionListResponse(BaseModel):
