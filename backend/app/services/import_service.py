@@ -36,14 +36,15 @@ async def process_import(job_id: str, user_id: str, file_path: str, bank_hint: s
             await db.commit()
 
             all_raw_rows = []
-            for chunk_text in chunks:
+            for i, chunk_text in enumerate(chunks):
                 if not chunk_text.strip():
                     continue
                 try:
                     raw_rows = await provider.extract_rows(chunk_text, bank_hint)
                     all_raw_rows.extend(raw_rows)
+                    print(f"Chunk {i+1}: Extracted {len(raw_rows)} rows")
                 except Exception as e:
-                    print(f"Chunk extraction failed: {e}")
+                    print(f"Chunk {i+1} extraction failed: {e}")
                     continue
 
             job.extracted_data = [r.model_dump(mode="json") for r in all_raw_rows]
@@ -94,7 +95,7 @@ async def process_import(job_id: str, user_id: str, file_path: str, bank_hint: s
                     user_id=user_id,
                     import_job_id=job_id,
                     date=tx.date,
-                    type=tx.type,
+                    type=tx.transaction_type,
                     description=tx.description,
                     category=tx.category,
                     amount=tx.amount,

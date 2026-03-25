@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date as DateType
 from decimal import Decimal
 from enum import Enum
 from pydantic import BaseModel, Field
@@ -52,7 +52,7 @@ class ModeEnum(str, Enum):
 # ── Phase 1: Extraction ───────────────────────────────────────────────────────
 
 class ExtractedRow(BaseModel):
-    date: date = Field(
+    date: DateType = Field(
         description="Transaction date. If only day/month is visible, assume the current year."
     )
     description: str = Field(
@@ -81,7 +81,7 @@ class ExtractedStatement(BaseModel):
 # ── Phase 2: Classification ───────────────────────────────────────────────────
 
 class ClassifiedTransaction(BaseModel):
-    date: date = Field(
+    date: DateType = Field(
         description="Transaction date."
     )
     description: str = Field(
@@ -91,7 +91,8 @@ class ClassifiedTransaction(BaseModel):
         ge=0,
         description="Positive transaction amount."
     )
-    type: TransactionType = Field(
+    transaction_type: TransactionType = Field(
+        alias="type",
         description=(
             "EXPENSE for debits, purchases, and withdrawals. "
             "INCOME for credits, salary deposits, and refunds. "
