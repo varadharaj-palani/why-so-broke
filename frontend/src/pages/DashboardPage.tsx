@@ -162,7 +162,7 @@ export default function DashboardPage() {
                   formatter={(v: number) => formatAmount(v)}
                   contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
                 />
-                <Bar dataKey="total" radius={[0, 3, 3, 0]} animationDuration={300}>
+                <Bar dataKey="total" radius={[0, 3, 3, 0]} isAnimationActive={false}>
                   {categoryData.map(entry => (
                     <Cell key={entry.category} fill={getCategoryColor(entry.category)} />
                   ))}
@@ -184,7 +184,7 @@ export default function DashboardPage() {
                   cy="45%"
                   innerRadius={40}
                   outerRadius={65}
-                  animationDuration={300}
+                  isAnimationActive={false}
                 >
                   {byMode.map((entry) => (
                     <Cell key={entry.mode} fill={getCategoryColor(entry.mode)} />
@@ -216,7 +216,7 @@ export default function DashboardPage() {
                     formatter={(v: number) => formatAmount(v)}
                     contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
                   />
-                  <Bar dataKey="total" fill="var(--amber)" name="Spend" radius={[3, 3, 0, 0]} animationDuration={300} />
+                  <Bar dataKey="total" fill="var(--amber)" name="Spend" radius={[3, 3, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             )
@@ -233,8 +233,8 @@ export default function DashboardPage() {
                     contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
                   />
                   <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-                  <Bar dataKey="income" fill="var(--green)" name="Income" radius={[3, 3, 0, 0]} animationDuration={300} />
-                  <Bar dataKey="expense" fill="var(--amber)" name="Expense" radius={[3, 3, 0, 0]} animationDuration={300} />
+                  <Bar dataKey="income" fill="var(--green)" name="Income" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="expense" fill="var(--amber)" name="Expense" radius={[3, 3, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             )
