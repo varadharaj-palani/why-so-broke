@@ -95,7 +95,7 @@ export default function DashboardPage() {
   })()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -169,7 +169,7 @@ export default function DashboardPage() {
       )}
 
       {/* Charts — row 1: category (2/3) + mode (1/3) */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-3 gap-5">
         <ChartCard title="Spend by category" className="md:col-span-2">
           {categoryData.length === 0 ? <EmptyChart /> : (
             <ResponsiveContainer width="100%" height={240}>
@@ -228,7 +228,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts — row 2: trend (1/3) + heatmap (2/3) */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-3 gap-5">
         <ChartCard title={range === 'month' ? 'Daily spending' : 'Monthly trend'}>
           {range === 'month' ? (
             dailyBarData.length === 0 ? <EmptyChart /> : (

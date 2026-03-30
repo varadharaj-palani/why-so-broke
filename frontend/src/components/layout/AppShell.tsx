@@ -64,13 +64,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   const displayName = user?.display_name || user?.username || ''
-  const initials = displayName.slice(0, 2).toUpperCase()
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
-      {/* Topbar */}
+    /*
+     * Layout strategy:
+     *   Mobile  — natural page scroll; header sticky top; bottom nav fixed bottom
+     *   Desktop — h-screen locked layout; sidebar + main content scroll internally
+     */
+    <div className="flex flex-col min-h-screen md:h-screen md:overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+
+      {/* Topbar — sticky on mobile, static on desktop */}
       <header
-        className="flex-shrink-0 h-12 flex items-center justify-between px-5 border-b"
+        className="flex-shrink-0 h-12 flex items-center justify-between px-5 border-b sticky md:static top-0 z-30"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
         <div className="flex items-center gap-2 text-[15px] font-medium">
@@ -93,34 +98,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 md:overflow-hidden">
         {/* Sidebar — desktop only */}
         <aside
           className="hidden md:flex flex-col flex-shrink-0 w-[200px] border-r"
           style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
         >
-          {/* User info */}
           <div className="px-4 py-3.5 border-b" style={{ borderColor: 'var(--border)' }}>
             <div className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{displayName}</div>
             <div className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>Personal account</div>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 py-2 overflow-y-auto">
-            <p className="text-[10px] font-medium uppercase tracking-[0.6px] px-4 py-1.5"
-              style={{ color: 'var(--text4)' }}>Overview</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.6px] px-4 py-1.5" style={{ color: 'var(--text4)' }}>Overview</p>
             {overviewNav.map(item => (
               <NavItem key={item.to} {...item} badgeCount={item.badge ? pendingCount : undefined} />
             ))}
-
-            <p className="text-[10px] font-medium uppercase tracking-[0.6px] px-4 py-1.5 mt-2"
-              style={{ color: 'var(--text4)' }}>Manage</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.6px] px-4 py-1.5 mt-2" style={{ color: 'var(--text4)' }}>Manage</p>
             {manageNav.map(item => (
               <NavItem key={item.to} {...item} />
             ))}
           </nav>
 
-          {/* Sign out */}
           <div className="px-4 py-3.5 border-t" style={{ borderColor: 'var(--border)' }}>
             <button
               onClick={logout}
@@ -135,17 +134,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
+        {/* Main content
+            Mobile : pb-20 so content clears the fixed bottom nav
+            Desktop: overflow-y-auto for internal scroll */}
+        <main className="flex-1 md:overflow-y-auto pb-20 md:pb-0">
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full">
             {children}
           </div>
         </main>
       </div>
 
-      {/* Bottom nav — mobile only, flex-shrink-0 so it stays at the bottom of the h-screen column */}
+      {/* Bottom nav — mobile only, fixed so it never scrolls away */}
       <nav
-        className="md:hidden flex-shrink-0 flex border-t"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex border-t"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
         {mobileNav.map(({ to, label, icon: Icon, badge: itemBadge }) => (
