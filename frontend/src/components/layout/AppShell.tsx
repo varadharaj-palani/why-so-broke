@@ -136,16 +136,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+        <main className="flex-1 overflow-y-auto">
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full">
             {children}
           </div>
         </main>
       </div>
 
-      {/* Bottom nav — mobile only, icons only to fit all 6 items */}
+      {/* Bottom nav — mobile only, flex-shrink-0 so it stays at the bottom of the h-screen column */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 flex border-t"
+        className="md:hidden flex-shrink-0 flex border-t"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
         {mobileNav.map(({ to, label, icon: Icon, badge: itemBadge }) => (
