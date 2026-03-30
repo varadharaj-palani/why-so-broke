@@ -122,15 +122,41 @@ export default function DashboardPage() {
       {/* All data sections fade together on filter change */}
       <div style={{ opacity: isTransitioning ? 0.45 : 1, transition: 'opacity 0.25s ease' }}>
 
-      {/* Summary cards */}
+      {/* Summary — mobile: compact single card with 3 rows */}
       {loading && !summary ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="sm:hidden h-[132px] rounded-xl animate-pulse" style={{ background: 'var(--border)' }} />
+      ) : summary && (
+        <div className="sm:hidden rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>Income</p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text4)' }}>{summary.transaction_count} transactions</p>
+            </div>
+            <p className="text-[17px] font-semibold" style={{ color: 'var(--green)' }}>{formatAmount(summary.total_income)}</p>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <p className="text-[11px] font-medium uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>Expenses</p>
+            <p className="text-[17px] font-semibold" style={{ color: 'var(--text)' }}>{formatAmount(summary.total_expense)}</p>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>Net balance</p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text4)' }}>{isDeficit ? 'Deficit this period' : 'Surplus this period'}</p>
+            </div>
+            <p className="text-[17px] font-semibold" style={{ color: isDeficit ? 'var(--amber)' : 'var(--green)' }}>{formatAmount(summary.net)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Summary — desktop: 3 accent cards */}
+      {loading && !summary ? (
+        <div className="hidden sm:grid sm:grid-cols-3 gap-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: 'var(--border)' }} />
           ))}
         </div>
       ) : summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="hidden sm:grid sm:grid-cols-3 gap-3">
           <StatCard label="Income" value={summary.total_income} sub={`${summary.transaction_count} transactions`} accent="green" />
           <StatCard label="Expenses" value={summary.total_expense} sub="" accent="default" />
           <StatCard

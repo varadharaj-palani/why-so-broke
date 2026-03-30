@@ -46,9 +46,9 @@ function ReviewModal({
   )
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.4)' }}
+    <div className="fixed inset-0 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto" style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="rounded-xl border p-4 sm:p-6 w-[460px] max-w-[94vw]" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+      <div className="rounded-xl border p-4 sm:p-6 w-[460px] max-w-full my-auto" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[16px] font-medium" style={{ color: 'var(--text)' }}>Review: {(item.description || item.raw_text || '').slice(0, 30)}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}>
@@ -83,11 +83,11 @@ function ReviewModal({
           </select>
         ))}
 
-        <div className="flex gap-2 mt-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded-md text-[13px] border" style={{ borderColor: 'var(--border2)', color: 'var(--text2)', background: 'var(--surface)' }}>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 mt-2">
+          <button onClick={onClose} className="sm:flex-1 py-2 rounded-md text-[13px] border" style={{ borderColor: 'var(--border2)', color: 'var(--text2)', background: 'var(--surface)' }}>
             Cancel
           </button>
-          <button onClick={onDiscard} className="flex-1 py-2 rounded-md text-[13px]" style={{ background: 'var(--al)', color: 'var(--amber)', border: '0.5px solid var(--amber)' }}>
+          <button onClick={onDiscard} className="sm:flex-1 py-2 rounded-md text-[13px]" style={{ background: 'var(--al)', color: 'var(--amber)', border: '0.5px solid var(--amber)' }}>
             Discard
           </button>
           <button
@@ -97,7 +97,7 @@ function ReviewModal({
               await onConfirm(form)
               setSaving(false)
             }}
-            className="flex-1 py-2 rounded-md text-[13px] text-white disabled:opacity-50"
+            className="sm:flex-1 py-2.5 rounded-md text-[13px] text-white disabled:opacity-50"
             style={{ background: 'var(--green)' }}
           >
             {saving ? 'Saving…' : 'Confirm & save'}
