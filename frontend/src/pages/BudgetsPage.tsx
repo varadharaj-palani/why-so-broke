@@ -371,7 +371,7 @@ export default function BudgetsPage() {
 
       {confirmDelete && (
         <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.4)' }}>
-          <div className="rounded-xl border p-6 w-[360px]" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <div className="rounded-xl border p-6 w-[360px] max-w-[94vw]" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
             <h3 className="text-[15px] font-medium mb-2" style={{ color: 'var(--text)' }}>Delete budget?</h3>
             <p className="text-[13px] mb-5" style={{ color: 'var(--text3)' }}>
               Delete the budget for <strong style={{ color: 'var(--text)' }}>{confirmDelete.category}</strong>? This cannot be undone.

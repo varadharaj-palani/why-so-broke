@@ -343,11 +343,11 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
   const textColor = accent === 'green' ? 'var(--green)' : accent === 'amber' ? 'var(--amber)' : 'var(--text)'
   return (
     <div
-      className="rounded-xl p-4 border-l-4"
+      className="rounded-xl p-3 sm:p-4 border-l-4"
       style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderLeft: `4px solid ${borderColor}` }}
     >
       <p className="text-[10px] uppercase tracking-[0.5px] font-medium mb-1.5" style={{ color: 'var(--text3)' }}>{label}</p>
-      <p className="text-[22px] font-medium" style={{ color: textColor }}>{formatAmount(value)}</p>
+      <p className="text-[17px] sm:text-[22px] font-medium" style={{ color: textColor }}>{formatAmount(value)}</p>
       {sub && <p className="text-[11px] mt-1" style={{ color: 'var(--text4)' }}>{sub}</p>}
     </div>
   )

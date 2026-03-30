@@ -48,9 +48,27 @@ export default function SettingsPage() {
     <div>
       <h2 className="text-[20px] font-medium mb-5" style={{ color: 'var(--text)' }}>Settings</h2>
 
-      <div className="flex gap-6">
-        {/* Left nav */}
-        <nav className="w-44 shrink-0">
+      {/* Mobile: horizontal scrollable pill tabs */}
+      <div className="flex overflow-x-auto gap-1.5 pb-2 mb-4 sm:hidden">
+        {NAV_GROUPS.flatMap(g => g.items).map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActive(item.id)}
+            className="flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors whitespace-nowrap"
+            style={{
+              background: active === item.id ? 'var(--gl)' : 'var(--surface)',
+              borderColor: active === item.id ? 'var(--green)' : 'var(--border)',
+              color: active === item.id ? 'var(--green)' : 'var(--text2)',
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:gap-6">
+        {/* Desktop: left sidebar nav */}
+        <nav className="hidden sm:block w-44 shrink-0">
           {NAV_GROUPS.map(group => (
             <div key={group.label} className="mb-5">
               <p className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 px-3" style={{ color: 'var(--text3)' }}>
@@ -76,7 +94,7 @@ export default function SettingsPage() {
           ))}
         </nav>
 
-        {/* Right content */}
+        {/* Content */}
         <div className="flex-1 min-w-0">
           {PANELS[active]}
         </div>

@@ -63,7 +63,7 @@ function ReviewModal({
         {field('Date', <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={fi} style={fiStyle} />)}
         {field('Name', <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={fi} style={fiStyle} />)}
         {field('Amount', <input type="text" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={fi} style={fiStyle} />)}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {field('Category', (
             <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={fi} style={fiStyle}>
               <option value="">Select…</option>
@@ -235,7 +235,7 @@ export default function UnverifiedPage() {
                 <div>
                   <p className="text-[14px] font-medium" style={{ color: 'var(--text)' }}>{item.description || item.raw_text?.slice(0, 40) || '—'}</p>
                   {item.raw_text && (
-                    <p className="text-[11px] font-mono mt-0.5 truncate max-w-[300px]" style={{ color: 'var(--text3)' }}>{item.raw_text}</p>
+                    <p className="text-[11px] font-mono mt-0.5 truncate" style={{ color: 'var(--text3)' }}>{item.raw_text}</p>
                   )}
                 </div>
                 <span className="text-[16px] font-medium flex-shrink-0 ml-4" style={{ color: 'var(--text)' }}>

@@ -21,7 +21,7 @@ const manageNav = [
   { to: '/settings', label: 'Settings', icon: Cog6ToothIcon },
 ]
 
-const mobileNav = [...overviewNav, ...manageNav].slice(0, 5)
+const mobileNav = [...overviewNav, ...manageNav]
 
 function NavItem({
   to, label, icon: Icon, badge, badgeCount,
@@ -137,7 +137,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
-          <div className="p-6 max-w-5xl mx-auto w-full">
+          <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full">
             {children}
           </div>
         </main>
@@ -154,12 +154,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center py-2 text-[11px] font-medium transition-colors ${
+              `flex-1 flex flex-col items-center py-1.5 text-[10px] font-medium transition-colors ${
                 isActive ? 'text-[var(--green)]' : 'text-[var(--text3)]'
               }`
             }
           >
-            <Icon className="w-5 h-5 mb-0.5" />
+            <Icon className="w-[18px] h-[18px] mb-0.5" />
             {label}
           </NavLink>
         ))}

@@ -104,16 +104,16 @@ function TransactionForm({
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3.5">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {field('Date', <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={fi} style={fiStyle} required />)}
             {field('Type', <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as 'expense' | 'income' | 'transfer' })} className={fi} style={fiStyle} disabled={!!initial}>{TYPES.map(t => <option key={t}>{t}</option>)}</select>)}
           </div>
           {field('Description', <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={fi} style={fiStyle} placeholder="e.g. Swiggy order" required />)}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {field('Category', <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={fi} style={fiStyle}>{categories.map(c => <option key={c}>{c}</option>)}</select>)}
             {field('Amount (₹)', <input type="number" step="0.01" min="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={fi} style={fiStyle} placeholder="0.00" required />)}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {field('Bank', <select value={form.bank_id} onChange={e => setForm({ ...form, bank_id: e.target.value })} className={fi} style={fiStyle}><option value="">Select bank…</option>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>)}
             {field('Mode', <select value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value })} className={fi} style={fiStyle}>{modes.map(m => <option key={m}>{m}</option>)}</select>)}
           </div>
