@@ -48,7 +48,7 @@ function ReviewModal({
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="rounded-xl border p-6 w-[460px] max-w-[94vw]" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+      <div className="rounded-xl border p-4 sm:p-6 w-[460px] max-w-[94vw]" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[16px] font-medium" style={{ color: 'var(--text)' }}>Review: {(item.description || item.raw_text || '').slice(0, 30)}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}>
@@ -231,14 +231,14 @@ export default function UnverifiedPage() {
                 e.currentTarget.style.background = 'var(--surface)'
               }}
             >
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <p className="text-[14px] font-medium" style={{ color: 'var(--text)' }}>{item.description || item.raw_text?.slice(0, 40) || '—'}</p>
+              <div className="flex justify-between items-start mb-2 gap-3">
+                <div className="min-w-0">
+                  <p className="text-[14px] font-medium truncate" style={{ color: 'var(--text)' }}>{item.description || item.raw_text?.slice(0, 40) || '—'}</p>
                   {item.raw_text && (
                     <p className="text-[11px] font-mono mt-0.5 truncate" style={{ color: 'var(--text3)' }}>{item.raw_text}</p>
                   )}
                 </div>
-                <span className="text-[16px] font-medium flex-shrink-0 ml-4" style={{ color: 'var(--text)' }}>
+                <span className="text-[15px] font-medium flex-shrink-0" style={{ color: 'var(--text)' }}>
                   {item.amount ? formatAmount(item.amount) : '—'}
                 </span>
               </div>

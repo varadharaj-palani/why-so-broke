@@ -21,7 +21,7 @@ const manageNav = [
   { to: '/settings', label: 'Settings', icon: Cog6ToothIcon },
 ]
 
-const mobileNav = [...overviewNav, ...manageNav]
+const mobileNav: { to: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: boolean }[] = [...overviewNav, ...manageNav]
 
 function NavItem({
   to, label, icon: Icon, badge, badgeCount,
@@ -143,24 +143,34 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* Bottom nav — mobile only */}
+      {/* Bottom nav — mobile only, icons only to fit all 6 items */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 flex border-t"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
-        {mobileNav.map(({ to, label, icon: Icon }) => (
+        {mobileNav.map(({ to, label, icon: Icon, badge: itemBadge }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center py-1.5 text-[10px] font-medium transition-colors ${
+              `flex-1 flex flex-col items-center justify-center py-2.5 transition-colors ${
                 isActive ? 'text-[var(--green)]' : 'text-[var(--text3)]'
               }`
             }
           >
-            <Icon className="w-[18px] h-[18px] mb-0.5" />
-            {label}
+            <div className="relative">
+              <Icon className="w-[22px] h-[22px]" />
+              {itemBadge && pendingCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1.5 w-[14px] h-[14px] flex items-center justify-center rounded-full text-[8px] font-bold text-white"
+                  style={{ background: 'var(--amber)' }}
+                >
+                  {pendingCount > 9 ? '9+' : pendingCount}
+                </span>
+              )}
+            </div>
+            <span className="sr-only">{label}</span>
           </NavLink>
         ))}
       </nav>

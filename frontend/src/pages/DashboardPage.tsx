@@ -97,17 +97,17 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Dashboard</h2>
           <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>Your financial overview</p>
         </div>
-        <div className="flex gap-1 p-1 rounded-full border" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+        <div className="flex gap-1 p-1 rounded-full border self-start" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
           {RANGES.map(r => (
             <button
               key={r.key}
               onClick={() => setRange(r.key)}
-              className="px-3 py-1.5 rounded-full text-[12px] transition-all whitespace-nowrap"
+              className="px-2.5 py-1.5 rounded-full text-[11px] sm:text-[12px] sm:px-3 transition-all whitespace-nowrap"
               style={range === r.key
                 ? { background: 'var(--surface)', color: 'var(--green)', fontWeight: 500, border: '0.5px solid var(--border)' }
                 : { color: 'var(--text2)', border: '0.5px solid transparent' }
@@ -124,13 +124,13 @@ export default function DashboardPage() {
 
       {/* Summary cards */}
       {loading && !summary ? (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: 'var(--border)' }} />
           ))}
         </div>
       ) : summary && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <StatCard label="Income" value={summary.total_income} sub={`${summary.transaction_count} transactions`} accent="green" />
           <StatCard label="Expenses" value={summary.total_expense} sub="" accent="default" />
           <StatCard
