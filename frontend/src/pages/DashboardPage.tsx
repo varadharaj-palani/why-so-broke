@@ -50,12 +50,12 @@ export default function DashboardPage() {
   const { summary, byCategory, trend, byMode, loading } = useAnalytics(trendMonths)
   const [dailySpend, setDailySpend] = useState<DailySpendItem[]>([])
 
-  useEffect(() => {
-    const dates = getRangeDates(range)
-    setFilters(dates)
+  const rangeDates = getRangeDates(range)
 
-    const from = dates.date_from || dayjs().startOf('year').format('YYYY-MM-DD')
-    const to = dates.date_to || dayjs().format('YYYY-MM-DD')
+  useEffect(() => {
+    setFilters(rangeDates)
+    const from = rangeDates.date_from || dayjs().subtract(2, 'year').format('YYYY-MM-DD')
+    const to = rangeDates.date_to || dayjs().format('YYYY-MM-DD')
     analyticsApi.dailySpend(from, to)
       .then(r => setDailySpend(r.data))
       .catch(() => {})
@@ -66,6 +66,9 @@ export default function DashboardPage() {
 
   const categoryData = byCategory.map(c => ({ ...c, total: parseFloat(c.total) }))
   const trendData = trend.map(t => ({ ...t, income: parseFloat(t.income), expense: parseFloat(t.expense) }))
+
+  // dynamic height for category chart based on number of categories
+  const categoryChartHeight = Math.max(160, categoryData.length * 32)
 
   return (
     <div className="space-y-5">
@@ -112,16 +115,26 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Charts 2×2 */}
-      <div className="grid md:grid-cols-2 gap-3">
-        <ChartCard title="Spend by category">
+      {/* Charts — row 1: category (2/3) + mode (1/3) */}
+      <div className="grid md:grid-cols-3 gap-3">
+        <ChartCard title="Spend by category" className="md:col-span-2">
           {categoryData.length === 0 ? <EmptyChart /> : (
-            <ResponsiveContainer width="100%" height={130}>
+            <ResponsiveContainer width="100%" height={categoryChartHeight}>
               <BarChart data={categoryData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={fmtAxis} />
-                <YAxis dataKey="category" type="category" tick={{ fontSize: 10, fill: 'var(--text3)' }} width={80} />
-                <Tooltip cursor={false} formatter={(v: number) => formatAmount(v)} contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }} />
+                <YAxis
+                  dataKey="category"
+                  type="category"
+                  tick={{ fontSize: 10, fill: 'var(--text3)' }}
+                  width={95}
+                  interval={0}
+                />
+                <Tooltip
+                  cursor={false}
+                  formatter={(v: number) => formatAmount(v)}
+                  contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
+                />
                 <Bar dataKey="total" radius={[0, 3, 3, 0]} animationDuration={300}>
                   {categoryData.map(entry => (
                     <Cell key={entry.category} fill={getCategoryColor(entry.category)} />
@@ -132,40 +145,81 @@ export default function DashboardPage() {
           )}
         </ChartCard>
 
-        <ChartCard title="Monthly trend">
-          {trendData.length === 0 ? <EmptyChart /> : (
-            <ResponsiveContainer width="100%" height={130}>
-              <BarChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text3)' }} />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={fmtAxis} />
-                <Tooltip cursor={false} formatter={(v: number) => formatAmount(v)} contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }} />
-                <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="income" fill="var(--green)" name="Income" radius={[3, 3, 0, 0]} animationDuration={300} />
-                <Bar dataKey="expense" fill="var(--amber)" name="Expense" radius={[3, 3, 0, 0]} animationDuration={300} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
         <ChartCard title="By payment mode">
           {byMode.length === 0 ? <EmptyChart /> : (
-            <ResponsiveContainer width="100%" height={130}>
+            <ResponsiveContainer width="100%" height={categoryChartHeight}>
               <PieChart>
-                <Pie data={byMode.map(m => ({ ...m, total: parseFloat(m.total) }))} dataKey="total" nameKey="mode" cx="50%" cy="50%" innerRadius={35} outerRadius={55} animationDuration={300}>
+                <Pie
+                  data={byMode.map(m => ({ ...m, total: parseFloat(m.total) }))}
+                  dataKey="total"
+                  nameKey="mode"
+                  cx="50%"
+                  cy="45%"
+                  innerRadius={40}
+                  outerRadius={65}
+                  animationDuration={300}
+                >
                   {byMode.map((entry) => (
                     <Cell key={entry.mode} fill={getCategoryColor(entry.mode)} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => formatAmount(v)} contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }} />
+                <Tooltip
+                  formatter={(v: number) => formatAmount(v)}
+                  contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
+                />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10, color: 'var(--text3)' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
         </ChartCard>
+      </div>
 
-        <ChartCard title="Daily spend pattern">
-          <SpendHeatmap data={dailySpend} />
+      {/* Charts — row 2: trend (1/3) + heatmap (2/3) */}
+      <div className="grid md:grid-cols-3 gap-3">
+        <ChartCard title={range === 'month' ? 'Daily spending' : 'Monthly trend'}>
+          {range === 'month' ? (
+            dailySpend.length === 0 ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={dailySpend.map(d => ({ day: dayjs(d.date).format('D'), total: parseFloat(d.total) }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--text3)' }} interval={1} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={fmtAxis} width={40} />
+                  <Tooltip
+                    cursor={false}
+                    formatter={(v: number) => formatAmount(v)}
+                    contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
+                  />
+                  <Bar dataKey="total" fill="var(--amber)" name="Spend" radius={[3, 3, 0, 0]} animationDuration={300} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          ) : (
+            trendData.length === 0 ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text3)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={fmtAxis} width={40} />
+                  <Tooltip
+                    cursor={false}
+                    formatter={(v: number) => formatAmount(v)}
+                    contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
+                  />
+                  <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="income" fill="var(--green)" name="Income" radius={[3, 3, 0, 0]} animationDuration={300} />
+                  <Bar dataKey="expense" fill="var(--amber)" name="Expense" radius={[3, 3, 0, 0]} animationDuration={300} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          )}
+        </ChartCard>
+
+        <ChartCard title="Daily spend pattern" className="md:col-span-2">
+          <SpendHeatmap
+            data={dailySpend}
+            dateFrom={rangeDates.date_from}
+            dateTo={rangeDates.date_to}
+          />
         </ChartCard>
       </div>
     </div>
@@ -174,14 +228,25 @@ export default function DashboardPage() {
 
 // ── Heatmap ───────────────────────────────────────────────────────────────────
 
-function SpendHeatmap({ data }: { data: DailySpendItem[] }) {
+function SpendHeatmap({
+  data,
+  dateFrom,
+  dateTo,
+}: {
+  data: DailySpendItem[]
+  dateFrom?: string
+  dateTo?: string
+}) {
   if (!data.length) return <EmptyChart />
 
   const dateMap = new Map(data.map(d => [d.date, parseFloat(d.total)]))
   const max = Math.max(...[...dateMap.values()], 1)
 
-  const start = dayjs(data[0].date).startOf('week')
-  const end   = dayjs(data[data.length - 1].date)
+  // Use filter range boundaries so month labels are accurate,
+  // falling back to data bounds for "all time"
+  const start = dayjs(dateFrom || data[0].date).startOf('week')
+  const end   = dayjs(dateTo   || data[data.length - 1].date)
+
   const weeks: string[][] = []
   let cur = start
   while (!cur.isAfter(end)) {
@@ -200,36 +265,60 @@ function SpendHeatmap({ data }: { data: DailySpendItem[] }) {
 
   const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
+  // Show month label on the first week column that contains a day in that month,
+  // not just on the week containing the 1st — avoids missing months.
+  const monthLabels = new Map<number, string>()
+  weeks.forEach((week, wi) => {
+    const firstDay = dayjs(week[0])
+    const monthKey = firstDay.month()
+    if (!monthLabels.has(monthKey)) {
+      monthLabels.set(monthKey, wi.toString())
+    }
+    // also track year+month to handle multi-year ranges
+    const key = firstDay.year() * 12 + firstDay.month()
+    if (!monthLabels.has(key)) {
+      monthLabels.set(key, wi.toString())
+    }
+  })
+
+  // Build a set of week indices that should show a month label
+  const labelWeekIndices = new Set<number>()
+  const seenMonths = new Set<number>()
+  weeks.forEach((week, wi) => {
+    const monthKey = dayjs(week[0]).year() * 12 + dayjs(week[0]).month()
+    if (!seenMonths.has(monthKey)) {
+      seenMonths.add(monthKey)
+      labelWeekIndices.add(wi)
+    }
+  })
+
   return (
     <div className="flex gap-1 overflow-x-auto pb-1">
       {/* Day-of-week labels */}
-      <div className="flex flex-col gap-[3px] pt-4 shrink-0">
+      <div className="flex flex-col gap-[3px] pt-5 shrink-0">
         {DAY_LABELS.map((d, i) => (
-          <div key={i} className="h-[11px] text-[8px] leading-none w-3 text-right" style={{ color: 'var(--text4)' }}>{d}</div>
+          <div key={i} className="h-[13px] text-[8px] leading-none w-3 text-right" style={{ color: 'var(--text4)' }}>{d}</div>
         ))}
       </div>
       {/* Week columns */}
-      {weeks.map((week, wi) => {
-        const monthStart = week.find(d => d.endsWith('-01'))
-        return (
-          <div key={wi} className="flex flex-col gap-[3px] shrink-0">
-            <div className="text-[8px] leading-none h-3 text-center" style={{ color: 'var(--text4)' }}>
-              {monthStart ? dayjs(monthStart).format('MMM') : ''}
-            </div>
-            {week.map(date => {
-              const amount = dateMap.get(date) ?? 0
-              return (
-                <div
-                  key={date}
-                  title={`${dayjs(date).format('DD MMM')}: ${amount > 0 ? formatAmount(amount) : 'No spend'}`}
-                  className="w-[11px] h-[11px] rounded-[2px] cursor-default"
-                  style={{ background: cellColor(amount) }}
-                />
-              )
-            })}
+      {weeks.map((week, wi) => (
+        <div key={wi} className="flex flex-col gap-[3px] shrink-0">
+          <div className="text-[8px] leading-none h-4 flex items-end justify-center" style={{ color: 'var(--text4)' }}>
+            {labelWeekIndices.has(wi) ? dayjs(week[0]).format('MMM') : ''}
           </div>
-        )
-      })}
+          {week.map(date => {
+            const amount = dateMap.get(date) ?? 0
+            return (
+              <div
+                key={date}
+                title={`${dayjs(date).format('DD MMM')}: ${amount > 0 ? formatAmount(amount) : 'No spend'}`}
+                className="w-[13px] h-[13px] rounded-[2px] cursor-default"
+                style={{ background: cellColor(amount) }}
+              />
+            )
+          })}
+        </div>
+      ))}
     </div>
   )
 }
@@ -251,9 +340,9 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
   )
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartCard({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="rounded-xl p-4 border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+    <div className={`rounded-xl p-4 border ${className}`} style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
       <p className="text-[11px] uppercase tracking-[0.5px] font-medium mb-3.5" style={{ color: 'var(--text3)' }}>{title}</p>
       {children}
     </div>
