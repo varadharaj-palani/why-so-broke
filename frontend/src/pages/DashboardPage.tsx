@@ -67,8 +67,19 @@ export default function DashboardPage() {
   const categoryData = byCategory.map(c => ({ ...c, total: parseFloat(c.total) }))
   const trendData = trend.map(t => ({ ...t, income: parseFloat(t.income), expense: parseFloat(t.expense) }))
 
-  // dynamic height for category chart based on number of categories
-  const categoryChartHeight = Math.max(160, categoryData.length * 32)
+  // Full date range for daily bar chart: day 1 of month → today, zeroing missing days
+  const dailyBarData = (() => {
+    const spendMap = new Map(dailySpend.map(d => [d.date, parseFloat(d.total)]))
+    const from = dayjs().startOf('month')
+    const to = dayjs()
+    const result: { day: string; total: number }[] = []
+    let cur = from
+    while (!cur.isAfter(to)) {
+      result.push({ day: cur.format('D'), total: spendMap.get(cur.format('YYYY-MM-DD')) ?? 0 })
+      cur = cur.add(1, 'day')
+    }
+    return result
+  })()
 
   return (
     <div className="space-y-5">
@@ -119,7 +130,7 @@ export default function DashboardPage() {
       <div className="grid md:grid-cols-3 gap-3">
         <ChartCard title="Spend by category" className="md:col-span-2">
           {categoryData.length === 0 ? <EmptyChart /> : (
-            <ResponsiveContainer width="100%" height={categoryChartHeight}>
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={categoryData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={fmtAxis} />
@@ -147,7 +158,7 @@ export default function DashboardPage() {
 
         <ChartCard title="By payment mode">
           {byMode.length === 0 ? <EmptyChart /> : (
-            <ResponsiveContainer width="100%" height={categoryChartHeight}>
+            <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie
                   data={byMode.map(m => ({ ...m, total: parseFloat(m.total) }))}
@@ -178,9 +189,9 @@ export default function DashboardPage() {
       <div className="grid md:grid-cols-3 gap-3">
         <ChartCard title={range === 'month' ? 'Daily spending' : 'Monthly trend'}>
           {range === 'month' ? (
-            dailySpend.length === 0 ? <EmptyChart /> : (
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={dailySpend.map(d => ({ day: dayjs(d.date).format('D'), total: parseFloat(d.total) }))}>
+            dailyBarData.length === 0 ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={dailyBarData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--text3)' }} interval={1} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={fmtAxis} width={40} />
@@ -195,7 +206,7 @@ export default function DashboardPage() {
             )
           ) : (
             trendData.length === 0 ? <EmptyChart /> : (
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text3)' }} />
@@ -265,23 +276,7 @@ function SpendHeatmap({
 
   const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-  // Show month label on the first week column that contains a day in that month,
-  // not just on the week containing the 1st — avoids missing months.
-  const monthLabels = new Map<number, string>()
-  weeks.forEach((week, wi) => {
-    const firstDay = dayjs(week[0])
-    const monthKey = firstDay.month()
-    if (!monthLabels.has(monthKey)) {
-      monthLabels.set(monthKey, wi.toString())
-    }
-    // also track year+month to handle multi-year ranges
-    const key = firstDay.year() * 12 + firstDay.month()
-    if (!monthLabels.has(key)) {
-      monthLabels.set(key, wi.toString())
-    }
-  })
-
-  // Build a set of week indices that should show a month label
+  // First week index per calendar month (year×12+month key)
   const labelWeekIndices = new Set<number>()
   const seenMonths = new Set<number>()
   weeks.forEach((week, wi) => {
@@ -293,17 +288,17 @@ function SpendHeatmap({
   })
 
   return (
-    <div className="flex gap-1 overflow-x-auto pb-1">
+    <div className="flex gap-[4px] overflow-x-auto pb-1">
       {/* Day-of-week labels */}
-      <div className="flex flex-col gap-[3px] pt-5 shrink-0">
+      <div className="flex flex-col gap-[4px] pt-6 shrink-0">
         {DAY_LABELS.map((d, i) => (
-          <div key={i} className="h-[13px] text-[8px] leading-none w-3 text-right" style={{ color: 'var(--text4)' }}>{d}</div>
+          <div key={i} className="h-[16px] text-[9px] leading-none w-3 text-right" style={{ color: 'var(--text4)' }}>{d}</div>
         ))}
       </div>
       {/* Week columns */}
       {weeks.map((week, wi) => (
-        <div key={wi} className="flex flex-col gap-[3px] shrink-0">
-          <div className="text-[8px] leading-none h-4 flex items-end justify-center" style={{ color: 'var(--text4)' }}>
+        <div key={wi} className="flex flex-col gap-[4px] shrink-0">
+          <div className="text-[9px] leading-none h-5 flex items-end justify-center" style={{ color: 'var(--text4)' }}>
             {labelWeekIndices.has(wi) ? dayjs(week[0]).format('MMM') : ''}
           </div>
           {week.map(date => {
@@ -312,7 +307,7 @@ function SpendHeatmap({
               <div
                 key={date}
                 title={`${dayjs(date).format('DD MMM')}: ${amount > 0 ? formatAmount(amount) : 'No spend'}`}
-                className="w-[13px] h-[13px] rounded-[2px] cursor-default"
+                className="w-[16px] h-[16px] rounded-[3px] cursor-default"
                 style={{ background: cellColor(amount) }}
               />
             )
