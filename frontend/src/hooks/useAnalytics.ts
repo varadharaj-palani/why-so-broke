@@ -12,7 +12,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced
 }
 
-export function useAnalytics() {
+export function useAnalytics(trendMonths = 12) {
   const { filters } = useFilterStore()
   const debouncedFilters = useDebounce(filters, 300)
 
@@ -28,7 +28,7 @@ export function useAnalytics() {
       const [s, c, t, m] = await Promise.all([
         analyticsApi.summary(debouncedFilters),
         analyticsApi.byCategory(debouncedFilters),
-        analyticsApi.monthlyTrend(12),
+        analyticsApi.monthlyTrend(trendMonths),
         analyticsApi.byMode(debouncedFilters),
       ])
       setSummary(s.data)
@@ -40,7 +40,7 @@ export function useAnalytics() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedFilters])
+  }, [debouncedFilters, trendMonths])
 
   useEffect(() => { fetch() }, [fetch])
 
