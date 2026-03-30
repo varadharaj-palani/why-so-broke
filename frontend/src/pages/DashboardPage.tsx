@@ -49,17 +49,30 @@ export default function DashboardPage() {
   const trendMonths = range === 'month' ? 1 : range === '3months' ? 3 : range === 'year' ? 12 : 24
   const { summary, byCategory, trend, byMode, loading } = useAnalytics(trendMonths)
   const [dailySpend, setDailySpend] = useState<DailySpendItem[]>([])
+  const [dailyLoading, setDailyLoading] = useState(false)
+  const [stale, setStale] = useState(false)
 
   const rangeDates = getRangeDates(range)
 
   useEffect(() => {
-    setFilters(rangeDates)
-    const from = rangeDates.date_from || dayjs().subtract(2, 'year').format('YYYY-MM-DD')
-    const to = rangeDates.date_to || dayjs().format('YYYY-MM-DD')
+    setStale(true)
+    setDailyLoading(true)
+    const dates = getRangeDates(range)
+    setFilters(dates)
+    const from = dates.date_from || dayjs().subtract(2, 'year').format('YYYY-MM-DD')
+    const to = dates.date_to || dayjs().format('YYYY-MM-DD')
     analyticsApi.dailySpend(from, to)
       .then(r => setDailySpend(r.data))
       .catch(() => {})
+      .finally(() => setDailyLoading(false))
   }, [range])
+
+  // Clear stale once analytics finishes (accounts for 300ms debounce in useAnalytics)
+  useEffect(() => {
+    if (!loading) setStale(false)
+  }, [loading])
+
+  const isTransitioning = stale || loading || dailyLoading
 
   const netValue = parseFloat(summary?.net || '0')
   const isDeficit = netValue < 0
@@ -105,6 +118,9 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* All data sections fade together on filter change */}
+      <div style={{ opacity: isTransitioning ? 0.45 : 1, transition: 'opacity 0.25s ease' }}>
 
       {/* Summary cards */}
       {loading && !summary ? (
@@ -233,6 +249,8 @@ export default function DashboardPage() {
           />
         </ChartCard>
       </div>
+
+      </div>{/* end fade wrapper */}
     </div>
   )
 }
