@@ -284,7 +284,7 @@ function SpendHeatmap({
   }
 
   const cellColor = (amount: number) => {
-    if (amount === 0) return 'var(--bg)'
+    if (amount === 0) return 'color-mix(in srgb, var(--border) 80%, var(--bg))'
     const t = amount / max
     if (t < 0.25) return 'color-mix(in srgb, var(--green) 20%, var(--bg))'
     if (t < 0.5)  return 'color-mix(in srgb, var(--green) 45%, var(--bg))'
