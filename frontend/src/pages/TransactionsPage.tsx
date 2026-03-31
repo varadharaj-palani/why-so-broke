@@ -228,11 +228,13 @@ export default function TransactionsPage() {
     setLoading(true)
     try {
       // Priority: drilldown > explicit panel date > view pill date
-      const dates = drillMonth
-        ? { date_from: `${drillMonth}-01`, date_to: dayjs(`${drillMonth}-01`).endOf('month').format('YYYY-MM-DD') }
-        : (panelFilters.date_from || panelFilters.date_to)
-          ? {}
-          : getViewDates(view)
+      const dates = importJobId
+        ? {}
+        : drillMonth
+          ? { date_from: `${drillMonth}-01`, date_to: dayjs(`${drillMonth}-01`).endOf('month').format('YYYY-MM-DD') }
+          : (panelFilters.date_from || panelFilters.date_to)
+            ? {}
+            : getViewDates(view)
       const res = await transactionsApi.list({
         ...panelFilters,
         ...dates,
