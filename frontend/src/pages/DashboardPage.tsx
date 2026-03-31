@@ -5,6 +5,7 @@ import { analyticsApi } from '../api/analytics'
 import { formatAmount } from '../utils/formatters'
 import { getCategoryColor } from '../utils/constants'
 import { DailySpendItem } from '../types'
+import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import dayjs from 'dayjs'
 import {
   BarChart, Bar, PieChart, Pie, Cell,
@@ -20,7 +21,7 @@ function getRangeDates(range: Range): { date_from?: string; date_to?: string } {
     date_to: today.format('YYYY-MM-DD'),
   }
   if (range === '3months') return {
-    date_from: today.subtract(90, 'day').format('YYYY-MM-DD'),
+    date_from: today.startOf('month').subtract(2, 'month').format('YYYY-MM-DD'),
     date_to: today.format('YYYY-MM-DD'),
   }
   if (range === 'year') return {
@@ -51,13 +52,15 @@ export default function DashboardPage() {
   const [dailySpend, setDailySpend] = useState<DailySpendItem[]>([])
   const [dailyLoading, setDailyLoading] = useState(false)
   const [stale, setStale] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [customDates, setCustomDates] = useState<{ date_from?: string; date_to?: string }>({})
 
-  const rangeDates = getRangeDates(range)
+  const rangeDates = customDates.date_from || customDates.date_to ? customDates : getRangeDates(range)
 
   useEffect(() => {
     setStale(true)
     setDailyLoading(true)
-    const dates = getRangeDates(range)
+    const dates = customDates.date_from || customDates.date_to ? customDates : getRangeDates(range)
     setFilters(dates)
     const from = dates.date_from || dayjs().subtract(2, 'year').format('YYYY-MM-DD')
     const to = dates.date_to || dayjs().format('YYYY-MM-DD')
@@ -65,7 +68,7 @@ export default function DashboardPage() {
       .then(r => setDailySpend(r.data))
       .catch(() => {})
       .finally(() => setDailyLoading(false))
-  }, [range])
+  }, [range, customDates, setFilters])
 
   // Clear stale once analytics finishes (accounts for 300ms debounce in useAnalytics)
   useEffect(() => {
@@ -102,22 +105,71 @@ export default function DashboardPage() {
           <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Dashboard</h2>
           <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>Your financial overview</p>
         </div>
-        <div className="flex gap-1 p-1 rounded-full border self-start" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
-          {RANGES.map(r => (
-            <button
-              key={r.key}
-              onClick={() => setRange(r.key)}
-              className="px-2.5 py-1.5 rounded-full text-[11px] sm:text-[12px] sm:px-3 transition-all whitespace-nowrap"
-              style={range === r.key
-                ? { background: 'var(--surface)', color: 'var(--green)', fontWeight: 500, border: '0.5px solid var(--border)' }
-                : { color: 'var(--text2)', border: '0.5px solid transparent' }
-              }
-            >
-              {r.label}
-            </button>
-          ))}
+        <div className="flex gap-2 self-start">
+          <div className="flex gap-1 p-1 rounded-full border" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+            {RANGES.map(r => (
+              <button
+                key={r.key}
+                onClick={() => { setRange(r.key); setCustomDates({}) }}
+                className="px-2.5 py-1.5 rounded-full text-[11px] sm:text-[12px] sm:px-3 transition-all whitespace-nowrap"
+                style={range === r.key && !customDates.date_from && !customDates.date_to
+                  ? { background: 'var(--surface)', color: 'var(--green)', fontWeight: 500, border: '0.5px solid var(--border)' }
+                  : { color: 'var(--text2)', border: '0.5px solid transparent' }
+                }
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="px-3 py-1.5 rounded-md border text-[13px] transition-colors flex items-center gap-1.5"
+            style={{
+              borderColor: customDates.date_from || customDates.date_to ? 'var(--green)' : 'var(--border2)',
+              background: customDates.date_from || customDates.date_to ? 'var(--gl)' : 'var(--surface)',
+              color: customDates.date_from || customDates.date_to ? 'var(--green)' : 'var(--text2)',
+            }}
+          >
+            <FunnelIcon className="w-3.5 h-3.5" />
+            Custom
+          </button>
         </div>
       </div>
+
+      {/* Custom date filter panel */}
+      {showFilters && (
+        <div className="rounded-lg border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>From</label>
+              <input
+                type="date"
+                value={customDates.date_from || ''}
+                onChange={e => setCustomDates({ ...customDates, date_from: e.target.value })}
+                className="w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
+                style={{ background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>To</label>
+              <input
+                type="date"
+                value={customDates.date_to || ''}
+                onChange={e => setCustomDates({ ...customDates, date_to: e.target.value })}
+                className="w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
+                style={{ background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }}
+              />
+            </div>
+          </div>
+          <button
+            onClick={() => { setCustomDates({}); setShowFilters(false) }}
+            className="mt-3 text-[12px] text-blue-600 hover:underline"
+            style={{ color: 'var(--green)' }}
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
 
       {/* All data sections fade together on filter change */}
       <div style={{ opacity: isTransitioning ? 0.45 : 1, transition: 'opacity 0.25s ease' }}>
