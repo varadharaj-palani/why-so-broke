@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.deps import get_current_user
@@ -163,30 +164,34 @@ async def create_transaction(
         )
         return result.scalar_one()
     else:
-        tx = Transaction(
-            user_id=current_user.id, date=body.date, type=body.type,
-            description=body.description, category=body.category,
-            amount=body.amount, bank_id=body.bank_id,
-            mode=body.mode, notes=body.notes,
-        )
-        db.add(tx)
-        await db.flush()
-        bank_name = await _bank_name(db, body.bank_id)
-        await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx.id, {
-            "description": body.description,
-            "amount": float(body.amount),
-            "category": body.category,
-            "bank_name": bank_name,
-            "mode": body.mode,
-            "type": body.type,
-        })
-        await db.commit()
-        result = await db.execute(
-            select(Transaction)
-            .options(selectinload(Transaction.bank), selectinload(Transaction.transfer_to_bank))
-            .where(Transaction.id == tx.id)
-        )
-        return result.scalar_one()
+        try:
+            tx = Transaction(
+                user_id=current_user.id, date=body.date, type=body.type,
+                description=body.description, category=body.category,
+                amount=body.amount, bank_id=body.bank_id,
+                mode=body.mode, notes=body.notes,
+            )
+            db.add(tx)
+            await db.flush()
+            bank_name = await _bank_name(db, body.bank_id)
+            await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx.id, {
+                "description": body.description,
+                "amount": float(body.amount),
+                "category": body.category,
+                "bank_name": bank_name,
+                "mode": body.mode,
+                "type": body.type,
+            })
+            await db.commit()
+            result = await db.execute(
+                select(Transaction)
+                .options(selectinload(Transaction.bank), selectinload(Transaction.transfer_to_bank))
+                .where(Transaction.id == tx.id)
+            )
+            return result.scalar_one()
+        except IntegrityError:
+            await db.rollback()
+            raise HTTPException(status_code=409, detail="A transaction with the same date, amount, category, and mode already exists")
 
 
 @router.put("/{transaction_id}", response_model=TransactionOut)

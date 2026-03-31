@@ -30,13 +30,14 @@ export default function ConfirmModal({
         <DialogPanel
           aria-labelledby={titleId}
           aria-describedby={description ? descId : undefined}
-          className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm"
+          className="rounded-xl p-6 w-full max-w-sm shadow-xl"
+          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
         >
-          <DialogTitle id={titleId} className="text-base font-semibold text-gray-900 mb-1">
+          <DialogTitle id={titleId} className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>
             {title}
           </DialogTitle>
           {description && (
-            <DialogDescription id={descId} className="text-sm text-gray-500 mb-5">
+            <DialogDescription id={descId} className="text-sm mb-5" style={{ color: 'var(--text3)' }}>
               {description}
             </DialogDescription>
           )}
@@ -44,13 +45,15 @@ export default function ConfirmModal({
           <div className="flex justify-end gap-3">
             <button
               onClick={onCancel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 text-sm font-medium border rounded-lg"
+              style={{ color: 'var(--text2)', borderColor: 'var(--border2)', background: 'var(--surface)' }}
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+              className="px-4 py-2 text-sm font-medium text-white rounded-lg"
+              style={{ background: 'var(--red)' }}
             >
               {confirmLabel}
             </button>

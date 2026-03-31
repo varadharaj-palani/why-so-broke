@@ -9,6 +9,7 @@ import { getCategoryChip, TYPES } from '../utils/constants'
 import { PlusIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import DropdownMenu from '../components/ui/DropdownMenu'
 import FilterPanel from '../components/transactions/FilterPanel'
+import ConfirmModal from '../components/ui/ConfirmModal'
 import api from '../api/client'
 import dayjs from 'dayjs'
 
@@ -210,6 +211,7 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
+  const [deleteTx, setDeleteTx] = useState<Transaction | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [view, setView] = useState<TxView>('month')
   const [drillMonth, setDrillMonth] = useState<string | null>(null)
@@ -258,8 +260,13 @@ export default function TransactionsPage() {
   }
 
   async function handleDelete(tx: Transaction) {
-    if (!confirm(`Delete "${tx.description}"?${tx.transfer_group_id ? ' Both transfer rows will be deleted.' : ''}`)) return
-    await transactionsApi.delete(tx.id)
+    setDeleteTx(tx)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTx) return
+    await transactionsApi.delete(deleteTx.id)
+    setDeleteTx(null)
     fetchData()
   }
 
@@ -499,6 +506,15 @@ export default function TransactionsPage() {
           initial={editTx || undefined}
         />
       )}
+
+      <ConfirmModal
+        open={!!deleteTx}
+        title={`Delete "${deleteTx?.description}"`}
+        description={deleteTx?.transfer_group_id ? 'Both transfer rows will be deleted.' : undefined}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTx(null)}
+      />
     </div>
   )
 }
