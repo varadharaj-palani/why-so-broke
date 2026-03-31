@@ -77,6 +77,8 @@ export interface ImportJob {
   error_message: string | null
   created_at: string
   completed_at: string | null
+  fully_extracted: number
+  pending_verification: number
 }
 
 export interface CategoryItem {
@@ -165,4 +167,5 @@ export interface Filters {
   mode?: string
   type?: string
   description?: string
+  import_job_id?: string
 }

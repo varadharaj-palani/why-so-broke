@@ -14,5 +14,7 @@ class ImportJobOut(BaseModel):
     error_message: str | None
     created_at: datetime
     completed_at: datetime | None
+    fully_extracted: int = 0
+    pending_verification: int = 0
 
     model_config = {"from_attributes": True}

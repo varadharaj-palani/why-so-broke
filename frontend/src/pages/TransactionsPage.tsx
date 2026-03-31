@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { transactionsApi } from '../api/transactions'
 import { categoriesApi } from '../api/categories'
 import { modesApi } from '../api/modes'
@@ -197,6 +198,9 @@ const VIEW_LABELS: Record<TxView, string> = {
 }
 
 export default function TransactionsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const importJobId = searchParams.get('import_job_id') || undefined
+
   // Local panel filters — intentionally NOT using the global filterStore to avoid
   // bleeding in dates set by DashboardPage or other pages.
   const [panelFilters, setPanelFilters] = useState<{ date_from?: string; date_to?: string; category?: string; bank_id?: string; mode?: string; type?: string }>({})
@@ -233,13 +237,14 @@ export default function TransactionsPage() {
         ...panelFilters,
         ...dates,
         description: search || undefined,
+        import_job_id: importJobId,
         per_page: 500,
       })
       setTransactions(res.data.items)
     } finally {
       setLoading(false)
     }
-  }, [view, drillMonth, panelFilters, search])
+  }, [view, drillMonth, panelFilters, search, importJobId])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -336,7 +341,22 @@ export default function TransactionsPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Transactions</h2>
-          <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>All recorded transactions</p>
+          {importJobId ? (
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-[11px] px-2 py-0.5 rounded-full border" style={{ background: 'var(--gl)', borderColor: 'var(--green)', color: 'var(--green)' }}>
+                Filtered by import job
+              </span>
+              <button
+                onClick={() => setSearchParams({})}
+                className="text-[11px] flex items-center gap-0.5"
+                style={{ color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <XMarkIcon className="w-3 h-3" /> Clear
+              </button>
+            </div>
+          ) : (
+            <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>All recorded transactions</p>
+          )}
         </div>
         <button
           onClick={() => { setEditTx(null); setShowForm(true) }}

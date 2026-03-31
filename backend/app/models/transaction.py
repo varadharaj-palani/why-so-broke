@@ -34,3 +34,4 @@ class Transaction(Base):
     user: Mapped["User"] = relationship("User", back_populates="transactions")
     bank: Mapped["Bank"] = relationship("Bank", foreign_keys=[bank_id])
     transfer_to_bank: Mapped["Bank"] = relationship("Bank", foreign_keys=[transfer_to_bank_id])
+    import_job: Mapped["ImportJob | None"] = relationship("ImportJob", back_populates="transactions")

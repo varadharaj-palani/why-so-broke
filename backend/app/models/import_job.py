@@ -25,3 +25,4 @@ class ImportJob(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="import_jobs")
     unverified_transactions: Mapped[list["UnverifiedTransaction"]] = relationship("UnverifiedTransaction", back_populates="import_job", cascade="all, delete-orphan")
+    transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="import_job")

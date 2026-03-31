@@ -37,6 +37,8 @@ def build_filter(current_user: User, **kwargs):
         conditions.append(Transaction.mode == kwargs["mode"])
     if kwargs.get("type"):
         conditions.append(Transaction.type == kwargs["type"])
+    if kwargs.get("import_job_id"):
+        conditions.append(Transaction.import_job_id == kwargs["import_job_id"])
     return conditions
 
 
@@ -75,6 +77,7 @@ async def list_transactions(
     mode: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
     description: Optional[str] = Query(None),
+    import_job_id: Optional[uuid.UUID] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
@@ -85,6 +88,7 @@ async def list_transactions(
         date_from=date_from, date_to=date_to,
         amount_min=amount_min, amount_max=amount_max,
         category=category, bank_id=bank_id, mode=mode, type=type,
+        import_job_id=import_job_id,
     )
     if description:
         conditions.append(Transaction.description.ilike(f"%{description}%"))
