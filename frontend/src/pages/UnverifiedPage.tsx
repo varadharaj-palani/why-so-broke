@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { unverifiedApi } from '../api/imports'
 import { categoriesApi } from '../api/categories'
 import { modesApi } from '../api/modes'
@@ -121,6 +122,9 @@ function Tag({ label }: { label: string }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function UnverifiedPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const importJobId = searchParams.get('import_job_id') || undefined
+
   const [items, setItems] = useState<UnverifiedTransaction[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -133,13 +137,13 @@ export default function UnverifiedPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await unverifiedApi.list({ status: 'pending', per_page: 50 })
+      const res = await unverifiedApi.list({ status: 'pending', import_job_id: importJobId, per_page: 50 })
       setItems(res.data.items)
       setTotal(res.data.total)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [importJobId])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -190,9 +194,24 @@ export default function UnverifiedPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Unverified</h2>
-          <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>
-            {total > 0 ? `${total} pending — click to review and confirm` : 'No pending transactions'}
-          </p>
+          {importJobId ? (
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-[11px] px-2 py-0.5 rounded-full border" style={{ background: 'var(--gl)', borderColor: 'var(--green)', color: 'var(--green)' }}>
+                Filtered by import job
+              </span>
+              <button
+                onClick={() => setSearchParams({})}
+                className="text-[11px] flex items-center gap-0.5"
+                style={{ color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <XMarkIcon className="w-3 h-3" /> Clear
+              </button>
+            </div>
+          ) : (
+            <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>
+              {total > 0 ? `${total} pending — click to review and confirm` : 'No pending transactions'}
+            </p>
+          )}
         </div>
         {items.length > 0 && (
           <button
