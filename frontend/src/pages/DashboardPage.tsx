@@ -391,10 +391,21 @@ function SpendHeatmap({
   let currentWeeks: (string | null)[][] = []
 
   weeks.forEach(week => {
-    const firstReal = week.find(d => d !== null)
-    if (!firstReal) return
+    // Check if week contains the 1st of any month — if so, use that month
+    let monthKey: number | null = null
+    for (const date of week) {
+      if (date !== null && dayjs(date).date() === 1) {
+        monthKey = dayjs(date).year() * 12 + dayjs(date).month()
+        break
+      }
+    }
 
-    const monthKey = dayjs(firstReal).year() * 12 + dayjs(firstReal).month()
+    // If no 1st found, use the first non-null date's month
+    if (monthKey === null) {
+      const firstReal = week.find(d => d !== null)
+      if (!firstReal) return
+      monthKey = dayjs(firstReal).year() * 12 + dayjs(firstReal).month()
+    }
 
     if (monthKey !== currentMonthKey) {
       if (currentWeeks.length > 0) {
