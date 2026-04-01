@@ -372,42 +372,64 @@ function SpendHeatmap({
 
   const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-  // First week index per calendar month (year×12+month key)
-  const labelWeekIndices = new Set<number>()
-  const seenMonths = new Set<number>()
-  weeks.forEach((week, wi) => {
+  // Group weeks by month
+  const monthGroups: { month: string; weeks: string[][] }[] = []
+  let currentMonthKey: number | null = null
+  let currentWeeks: string[][] = []
+
+  weeks.forEach(week => {
     const monthKey = dayjs(week[0]).year() * 12 + dayjs(week[0]).month()
-    if (!seenMonths.has(monthKey)) {
-      seenMonths.add(monthKey)
-      labelWeekIndices.add(wi)
+    if (monthKey !== currentMonthKey) {
+      if (currentWeeks.length > 0) {
+        monthGroups.push({
+          month: dayjs(currentWeeks[0][0]).format('MMM'),
+          weeks: currentWeeks,
+        })
+      }
+      currentMonthKey = monthKey
+      currentWeeks = [week]
+    } else {
+      currentWeeks.push(week)
     }
   })
+  if (currentWeeks.length > 0) {
+    monthGroups.push({
+      month: dayjs(currentWeeks[0][0]).format('MMM'),
+      weeks: currentWeeks,
+    })
+  }
 
   return (
-    <div className="flex gap-[4px] overflow-x-auto pb-1">
+    <div className="flex gap-6 overflow-x-auto pb-1">
       {/* Day-of-week labels */}
       <div className="flex flex-col gap-[4px] pt-6 shrink-0">
         {DAY_LABELS.map((d, i) => (
           <div key={i} className="h-[16px] text-[9px] leading-none w-3 text-right" style={{ color: 'var(--text4)' }}>{d}</div>
         ))}
       </div>
-      {/* Week columns */}
-      {weeks.map((week, wi) => (
-        <div key={wi} className="flex flex-col gap-[4px] shrink-0">
-          <div className="text-[9px] leading-none h-5 flex items-end justify-center" style={{ color: 'var(--text4)' }}>
-            {labelWeekIndices.has(wi) ? dayjs(week[0]).format('MMM') : ''}
+      {/* Month sections */}
+      {monthGroups.map((group, gi) => (
+        <div key={gi} className="shrink-0">
+          <div className="text-[9px] font-medium h-5 flex items-end justify-center mb-1" style={{ color: 'var(--text3)' }}>
+            {group.month}
           </div>
-          {week.map(date => {
-            const amount = dateMap.get(date) ?? 0
-            return (
-              <div
-                key={date}
-                title={`${dayjs(date).format('DD MMM')}: ${amount > 0 ? formatAmount(amount) : 'No spend'}`}
-                className="w-[16px] h-[16px] rounded-[3px] cursor-default"
-                style={{ background: cellColor(amount) }}
-              />
-            )
-          })}
+          <div className="flex gap-[4px]">
+            {group.weeks.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-[4px] shrink-0">
+                {week.map(date => {
+                  const amount = dateMap.get(date) ?? 0
+                  return (
+                    <div
+                      key={date}
+                      title={`${dayjs(date).format('DD MMM')}: ${amount > 0 ? formatAmount(amount) : 'No spend'}`}
+                      className="w-[16px] h-[16px] rounded-[3px] cursor-default"
+                      style={{ background: cellColor(amount) }}
+                    />
+                  )
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
