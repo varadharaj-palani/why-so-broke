@@ -351,13 +351,23 @@ function SpendHeatmap({
 
   // Use filter range boundaries so month labels are accurate,
   // falling back to data bounds for "all time"
-  const start = dayjs(dateFrom || data[0].date).startOf('week')
-  const end   = dayjs(dateTo   || data[data.length - 1].date).endOf('week')
+  const rangeStart = dateFrom ? dayjs(dateFrom) : dayjs(data[0].date)
+  const rangeEnd = dateTo ? dayjs(dateTo) : dayjs(data[data.length - 1].date)
+  const start = rangeStart.startOf('week')
+  const end   = rangeEnd.endOf('week')
 
   const weeks: string[][] = []
   let cur = start
   while (!cur.isAfter(end)) {
-    weeks.push(Array.from({ length: 7 }, (_, i) => cur.clone().add(i, 'day').format('YYYY-MM-DD')))
+    const week = Array.from({ length: 7 }, (_, i) => cur.clone().add(i, 'day').format('YYYY-MM-DD'))
+    // Only include weeks that have at least one day within the requested range
+    const hasDateInRange = week.some(date => {
+      const d = dayjs(date)
+      return !d.isBefore(rangeStart) && !d.isAfter(rangeEnd)
+    })
+    if (hasDateInRange) {
+      weeks.push(week)
+    }
     cur = cur.add(7, 'day')
   }
 
