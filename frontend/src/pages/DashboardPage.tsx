@@ -353,27 +353,6 @@ function SpendHeatmap({
   const rangeStart = dateFrom ? dayjs(dateFrom) : dayjs(data[0].date)
   const rangeEnd = dateTo ? dayjs(dateTo) : dayjs(data[data.length - 1].date)
 
-  // Start from the Sunday of the week containing rangeStart
-  const firstSunday = rangeStart.startOf('week')
-  const endSaturday = rangeEnd.endOf('week')
-
-  // Generate week arrays with null for dates outside range
-  const weeks: (string | null)[][] = []
-  let cur = firstSunday
-  while (!cur.isAfter(endSaturday)) {
-    const week = Array.from({ length: 7 }, (_, i) => {
-      const d = cur.clone().add(i, 'day')
-      // null = outside range, renders blank
-      if (d.isBefore(rangeStart) || d.isAfter(rangeEnd)) return null
-      return d.format('YYYY-MM-DD')
-    })
-    // Skip week if entirely outside range
-    if (week.some(d => d !== null)) {
-      weeks.push(week)
-    }
-    cur = cur.add(7, 'day')
-  }
-
   const cellColor = (amount: number) => {
     if (amount === 0) return 'color-mix(in srgb, var(--border) 80%, var(--bg))'
     const t = amount / max
@@ -385,42 +364,34 @@ function SpendHeatmap({
 
   const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-  // Group weeks by month
-  // A week belongs to the month of its first non-null date
-  const monthGroups: { month: string; monthKey: number; weeks: (string | null)[][] }[] = []
-  let currentMonthKey: number | null = null
-  let currentWeeks: (string | null)[][] = []
+  // Build month groups independently — each month only contains its own dates.
+  // Weeks that span two months get a partial column in each month (null for days
+  // outside that month), giving irregular grids at month boundaries.
+  const monthGroups: { month: string; weeks: (string | null)[][] }[] = []
 
-  weeks.forEach(week => {
-    // Find the first non-null date in this week
-    const firstReal = week.find(d => d !== null)
-    if (!firstReal) return
+  let curMonth = rangeStart.startOf('month')
+  while (!curMonth.isAfter(rangeEnd)) {
+    const monthStart = curMonth.isBefore(rangeStart) ? rangeStart : curMonth
+    const monthEnd = curMonth.endOf('month').isAfter(rangeEnd) ? rangeEnd : curMonth.endOf('month')
 
-    // Week belongs to the month of its first date
-    const monthKey = dayjs(firstReal).year() * 12 + dayjs(firstReal).month()
-
-    if (monthKey !== currentMonthKey) {
-      if (currentWeeks.length > 0 && currentMonthKey !== null) {
-        const d = dayjs().year(Math.floor(currentMonthKey / 12)).month(currentMonthKey % 12)
-        monthGroups.push({
-          month: d.format('MMM'),
-          monthKey: currentMonthKey,
-          weeks: currentWeeks,
-        })
-      }
-      currentMonthKey = monthKey
-      currentWeeks = [week]
-    } else {
-      currentWeeks.push(week)
+    // Collect this month's dates into week-indexed slots
+    const weekMap = new Map<string, (string | null)[]>()
+    let d = monthStart
+    while (!d.isAfter(monthEnd)) {
+      const sunday = d.startOf('week').format('YYYY-MM-DD')
+      if (!weekMap.has(sunday)) weekMap.set(sunday, Array(7).fill(null))
+      weekMap.get(sunday)![d.day()] = d.format('YYYY-MM-DD')
+      d = d.add(1, 'day')
     }
-  })
-  if (currentWeeks.length > 0 && currentMonthKey !== null) {
-    const d = dayjs().year(Math.floor(currentMonthKey / 12)).month(currentMonthKey % 12)
-    monthGroups.push({
-      month: d.format('MMM'),
-      monthKey: currentMonthKey,
-      weeks: currentWeeks,
-    })
+
+    const weeks = [...weekMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, w]) => w)
+
+    if (weeks.length > 0) {
+      monthGroups.push({ month: curMonth.format('MMM'), weeks })
+    }
+    curMonth = curMonth.add(1, 'month')
   }
 
   return (
