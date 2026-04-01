@@ -22,11 +22,11 @@ function getRangeDates(range: Range): { date_from?: string; date_to?: string } {
   }
   if (range === '3months') return {
     date_from: today.startOf('month').subtract(2, 'month').format('YYYY-MM-DD'),
-    date_to: today.format('YYYY-MM-DD'),
+    date_to: today.endOf('month').format('YYYY-MM-DD'),
   }
   if (range === 'year') return {
     date_from: today.startOf('year').format('YYYY-MM-DD'),
-    date_to: today.format('YYYY-MM-DD'),
+    date_to: today.endOf('month').format('YYYY-MM-DD'),
   }
   return {}
 }
@@ -349,19 +349,28 @@ function SpendHeatmap({
   const dateMap = new Map(data.map(d => [d.date, parseFloat(d.total)]))
   const max = Math.max(...[...dateMap.values()], 1)
 
-  // Use filter range boundaries so month labels are accurate,
-  // falling back to data bounds for "all time"
+  // Use filter range boundaries, falling back to data bounds for "all time"
   const rangeStart = dateFrom ? dayjs(dateFrom) : dayjs(data[0].date)
   const rangeEnd = dateTo ? dayjs(dateTo) : dayjs(data[data.length - 1].date)
 
   // Start from the Sunday of the week containing rangeStart
-  const start = rangeStart.startOf('week')
-  const end = rangeEnd.endOf('week')
+  const firstSunday = rangeStart.startOf('week')
+  const endSaturday = rangeEnd.endOf('week')
 
-  const weeks: string[][] = []
-  let cur = start
-  while (!cur.isAfter(end)) {
-    weeks.push(Array.from({ length: 7 }, (_, i) => cur.clone().add(i, 'day').format('YYYY-MM-DD')))
+  // Generate week arrays with null for dates outside range
+  const weeks: (string | null)[][] = []
+  let cur = firstSunday
+  while (!cur.isAfter(endSaturday)) {
+    const week = Array.from({ length: 7 }, (_, i) => {
+      const d = cur.clone().add(i, 'day')
+      // null = outside range, renders blank
+      if (d.isBefore(rangeStart) || d.isAfter(rangeEnd)) return null
+      return d.format('YYYY-MM-DD')
+    })
+    // Skip week if entirely outside range
+    if (week.some(d => d !== null)) {
+      weeks.push(week)
+    }
     cur = cur.add(7, 'day')
   }
 
@@ -376,45 +385,22 @@ function SpendHeatmap({
 
   const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-  // Group weeks by month - a week belongs to a month if it contains that month's dates
-  // Priority: if week has the 1st of a month, use that month; else use majority month
-  const monthGroups: { month: string; weeks: string[][] }[] = []
+  // Group weeks by month using the first non-null date
+  const monthGroups: { month: string; weeks: (string | null)[][] }[] = []
   let currentMonthKey: number | null = null
-  let currentWeeks: string[][] = []
+  let currentWeeks: (string | null)[][] = []
 
   weeks.forEach(week => {
-    // Check if week contains the 1st of any month - if so, use that month
-    let monthKey: number | null = null
-    for (const date of week) {
-      const d = dayjs(date)
-      if (d.date() === 1) {
-        monthKey = d.year() * 12 + d.month()
-        break
-      }
-    }
+    const firstReal = week.find(d => d !== null)
+    if (!firstReal) return
 
-    // If no 1st found, count which month has more days in this week
-    if (monthKey === null) {
-      const monthCounts = new Map<number, number>()
-      for (const date of week) {
-        const d = dayjs(date)
-        const mk = d.year() * 12 + d.month()
-        monthCounts.set(mk, (monthCounts.get(mk) ?? 0) + 1)
-      }
-      // Get month with most days
-      let maxCount = 0
-      for (const [mk, count] of monthCounts) {
-        if (count > maxCount) {
-          maxCount = count
-          monthKey = mk
-        }
-      }
-    }
+    const monthKey = dayjs(firstReal).year() * 12 + dayjs(firstReal).month()
 
     if (monthKey !== currentMonthKey) {
       if (currentWeeks.length > 0) {
+        const firstDate = currentWeeks[0].find(d => d !== null)
         monthGroups.push({
-          month: dayjs(currentWeeks[0][0]).format('MMM'),
+          month: dayjs(firstDate!).format('MMM'),
           weeks: currentWeeks,
         })
       }
@@ -425,8 +411,9 @@ function SpendHeatmap({
     }
   })
   if (currentWeeks.length > 0) {
+    const firstDate = currentWeeks[0].find(d => d !== null)
     monthGroups.push({
-      month: dayjs(currentWeeks[0][0]).format('MMM'),
+      month: dayjs(firstDate!).format('MMM'),
       weeks: currentWeeks,
     })
   }
@@ -448,17 +435,18 @@ function SpendHeatmap({
           <div className="flex gap-[4px]">
             {group.weeks.map((week, wi) => (
               <div key={wi} className="flex flex-col gap-[4px] shrink-0">
-                {week.map(date => {
-                  const amount = dateMap.get(date) ?? 0
-                  return (
+                {week.map((date, di) =>
+                  date === null ? (
+                    <div key={di} className="w-[16px] h-[16px] rounded-[3px]" style={{ background: 'transparent' }} />
+                  ) : (
                     <div
                       key={date}
-                      title={`${dayjs(date).format('DD MMM')}: ${amount > 0 ? formatAmount(amount) : 'No spend'}`}
+                      title={`${dayjs(date).format('DD MMM')}: ${(dateMap.get(date) ?? 0) > 0 ? formatAmount(dateMap.get(date) ?? 0) : 'No spend'}`}
                       className="w-[16px] h-[16px] rounded-[3px] cursor-default"
-                      style={{ background: cellColor(amount) }}
+                      style={{ background: cellColor(dateMap.get(date) ?? 0) }}
                     />
                   )
-                })}
+                )}
               </div>
             ))}
           </div>
