@@ -353,21 +353,15 @@ function SpendHeatmap({
   // falling back to data bounds for "all time"
   const rangeStart = dateFrom ? dayjs(dateFrom) : dayjs(data[0].date)
   const rangeEnd = dateTo ? dayjs(dateTo) : dayjs(data[data.length - 1].date)
+
+  // Start from the Sunday of the week containing rangeStart
   const start = rangeStart.startOf('week')
-  const end   = rangeEnd.endOf('week')
+  const end = rangeEnd.endOf('week')
 
   const weeks: string[][] = []
   let cur = start
   while (!cur.isAfter(end)) {
-    const week = Array.from({ length: 7 }, (_, i) => cur.clone().add(i, 'day').format('YYYY-MM-DD'))
-    // Only include weeks that have at least one day within the requested range
-    const hasDateInRange = week.some(date => {
-      const d = dayjs(date)
-      return !d.isBefore(rangeStart) && !d.isAfter(rangeEnd)
-    })
-    if (hasDateInRange) {
-      weeks.push(week)
-    }
+    weeks.push(Array.from({ length: 7 }, (_, i) => cur.clone().add(i, 'day').format('YYYY-MM-DD')))
     cur = cur.add(7, 'day')
   }
 
@@ -382,26 +376,39 @@ function SpendHeatmap({
 
   const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-  // Group weeks by month (based on which month the week's dates primarily belong to)
+  // Group weeks by month - a week belongs to a month if it contains that month's dates
+  // Priority: if week has the 1st of a month, use that month; else use majority month
   const monthGroups: { month: string; weeks: string[][] }[] = []
   let currentMonthKey: number | null = null
   let currentWeeks: string[][] = []
 
   weeks.forEach(week => {
-    // Determine which month this week belongs to by checking which dates are in it
-    // If week contains the 1st of a month, use that month. Otherwise use the first day's month.
+    // Check if week contains the 1st of any month - if so, use that month
     let monthKey: number | null = null
     for (const date of week) {
       const d = dayjs(date)
       if (d.date() === 1) {
-        // This week contains the 1st of some month, use that month
         monthKey = d.year() * 12 + d.month()
         break
       }
     }
-    // If no 1st found, use the first date's month
+
+    // If no 1st found, count which month has more days in this week
     if (monthKey === null) {
-      monthKey = dayjs(week[0]).year() * 12 + dayjs(week[0]).month()
+      const monthCounts = new Map<number, number>()
+      for (const date of week) {
+        const d = dayjs(date)
+        const mk = d.year() * 12 + d.month()
+        monthCounts.set(mk, (monthCounts.get(mk) ?? 0) + 1)
+      }
+      // Get month with most days
+      let maxCount = 0
+      for (const [mk, count] of monthCounts) {
+        if (count > maxCount) {
+          maxCount = count
+          monthKey = mk
+        }
+      }
     }
 
     if (monthKey !== currentMonthKey) {
