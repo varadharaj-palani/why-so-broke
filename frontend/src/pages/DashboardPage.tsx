@@ -352,7 +352,7 @@ function SpendHeatmap({
   // Use filter range boundaries so month labels are accurate,
   // falling back to data bounds for "all time"
   const start = dayjs(dateFrom || data[0].date).startOf('week')
-  const end   = dayjs(dateTo   || data[data.length - 1].date)
+  const end   = dayjs(dateTo   || data[data.length - 1].date).endOf('week')
 
   const weeks: string[][] = []
   let cur = start
