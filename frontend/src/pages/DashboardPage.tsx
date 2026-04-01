@@ -372,13 +372,28 @@ function SpendHeatmap({
 
   const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-  // Group weeks by month
+  // Group weeks by month (based on which month the week's dates primarily belong to)
   const monthGroups: { month: string; weeks: string[][] }[] = []
   let currentMonthKey: number | null = null
   let currentWeeks: string[][] = []
 
   weeks.forEach(week => {
-    const monthKey = dayjs(week[0]).year() * 12 + dayjs(week[0]).month()
+    // Determine which month this week belongs to by checking which dates are in it
+    // If week contains the 1st of a month, use that month. Otherwise use the first day's month.
+    let monthKey: number | null = null
+    for (const date of week) {
+      const d = dayjs(date)
+      if (d.date() === 1) {
+        // This week contains the 1st of some month, use that month
+        monthKey = d.year() * 12 + d.month()
+        break
+      }
+    }
+    // If no 1st found, use the first date's month
+    if (monthKey === null) {
+      monthKey = dayjs(week[0]).year() * 12 + dayjs(week[0]).month()
+    }
+
     if (monthKey !== currentMonthKey) {
       if (currentWeeks.length > 0) {
         monthGroups.push({
