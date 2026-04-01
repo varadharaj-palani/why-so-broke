@@ -385,8 +385,10 @@ function SpendHeatmap({
 
   const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-  // Group weeks by month using the first non-null date
-  const monthGroups: { month: string; weeks: (string | null)[][] }[] = []
+  // Group weeks by month
+  // Strategy: if a week contains the 1st of a month, it belongs to that month
+  // Otherwise, assign it to the month with the majority of dates in that week
+  const monthGroups: { month: string; monthKey: number; weeks: (string | null)[][] }[] = []
   let currentMonthKey: number | null = null
   let currentWeeks: (string | null)[][] = []
 
@@ -400,18 +402,31 @@ function SpendHeatmap({
       }
     }
 
-    // If no 1st found, use the first non-null date's month
+    // If no 1st found, count which month has more days in this week
     if (monthKey === null) {
-      const firstReal = week.find(d => d !== null)
-      if (!firstReal) return
-      monthKey = dayjs(firstReal).year() * 12 + dayjs(firstReal).month()
+      const monthCounts = new Map<number, number>()
+      for (const date of week) {
+        if (date !== null) {
+          const mk = dayjs(date).year() * 12 + dayjs(date).month()
+          monthCounts.set(mk, (monthCounts.get(mk) ?? 0) + 1)
+        }
+      }
+      // Get month with most days
+      let maxCount = 0
+      for (const [mk, count] of monthCounts) {
+        if (count > maxCount) {
+          maxCount = count
+          monthKey = mk
+        }
+      }
     }
 
     if (monthKey !== currentMonthKey) {
-      if (currentWeeks.length > 0) {
-        const firstDate = currentWeeks[0].find(d => d !== null)
+      if (currentWeeks.length > 0 && currentMonthKey !== null) {
+        const d = dayjs().year(Math.floor(currentMonthKey / 12)).month(currentMonthKey % 12)
         monthGroups.push({
-          month: dayjs(firstDate!).format('MMM'),
+          month: d.format('MMM'),
+          monthKey: currentMonthKey,
           weeks: currentWeeks,
         })
       }
@@ -421,10 +436,11 @@ function SpendHeatmap({
       currentWeeks.push(week)
     }
   })
-  if (currentWeeks.length > 0) {
-    const firstDate = currentWeeks[0].find(d => d !== null)
+  if (currentWeeks.length > 0 && currentMonthKey !== null) {
+    const d = dayjs().year(Math.floor(currentMonthKey / 12)).month(currentMonthKey % 12)
     monthGroups.push({
-      month: dayjs(firstDate!).format('MMM'),
+      month: d.format('MMM'),
+      monthKey: currentMonthKey,
       weeks: currentWeeks,
     })
   }
