@@ -18,7 +18,7 @@ function getRangeDates(range: Range): { date_from?: string; date_to?: string } {
   const today = dayjs()
   if (range === 'month') return {
     date_from: today.startOf('month').format('YYYY-MM-DD'),
-    date_to: today.format('YYYY-MM-DD'),
+    date_to: today.endOf('month').format('YYYY-MM-DD'),
   }
   if (range === '3months') return {
     date_from: today.startOf('month').subtract(2, 'month').format('YYYY-MM-DD'),
@@ -357,7 +357,7 @@ function SpendHeatmap({
   const weeks: string[][] = []
   let cur = start
   while (!cur.isAfter(end)) {
-    weeks.push(Array.from({ length: 7 }, (_, i) => cur.add(i, 'day').format('YYYY-MM-DD')))
+    weeks.push(Array.from({ length: 7 }, (_, i) => cur.clone().add(i, 'day').format('YYYY-MM-DD')))
     cur = cur.add(7, 'day')
   }
 
