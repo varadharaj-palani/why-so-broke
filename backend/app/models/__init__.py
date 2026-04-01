@@ -5,8 +5,11 @@ from app.models.transaction import Transaction
 from app.models.unverified_transaction import UnverifiedTransaction
 from app.models.budget import Budget
 from app.models.activity_log import ActivityLog
+from app.models.category import Category
+from app.models.mode import Mode
 
 __all__ = [
     "User", "Bank", "ImportJob", "Transaction",
-    "UnverifiedTransaction", "Budget", "ActivityLog"
+    "UnverifiedTransaction", "Budget", "ActivityLog",
+    "Category", "Mode",
 ]

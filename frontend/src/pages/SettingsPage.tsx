@@ -1,116 +1,104 @@
-import { useState, useEffect } from 'react'
-import { useAuth } from '../hooks/useAuth'
-import { Bank } from '../types'
-import { formatDateTime } from '../utils/formatters'
-import { PlusIcon } from '@heroicons/react/24/outline'
-import api from '../api/client'
-import axios from 'axios'
+import { useState } from 'react'
+import ProfilePanel from '../components/settings/ProfilePanel'
+import BanksPanel from '../components/settings/BanksPanel'
+import CategoriesPanel from '../components/settings/CategoriesPanel'
+import ModesPanel from '../components/settings/ModesPanel'
+import ExportPanel from '../components/settings/ExportPanel'
+import ActivityLogPanel from '../components/settings/ActivityLogPanel'
+
+type Panel = 'profile' | 'banks' | 'categories' | 'modes' | 'export' | 'activity'
+
+const NAV_GROUPS = [
+  {
+    label: 'Account',
+    items: [
+      { id: 'profile' as Panel, label: 'Profile' },
+      { id: 'banks' as Panel, label: 'Banks' },
+    ],
+  },
+  {
+    label: 'Customize',
+    items: [
+      { id: 'categories' as Panel, label: 'Categories' },
+      { id: 'modes' as Panel, label: 'Payment modes' },
+    ],
+  },
+  {
+    label: 'Data',
+    items: [
+      { id: 'export' as Panel, label: 'Export' },
+      { id: 'activity' as Panel, label: 'Activity log' },
+    ],
+  },
+]
+
+const PANELS: Record<Panel, React.ReactNode> = {
+  profile: <ProfilePanel />,
+  banks: <BanksPanel />,
+  categories: <CategoriesPanel />,
+  modes: <ModesPanel />,
+  export: <ExportPanel />,
+  activity: <ActivityLogPanel />,
+}
 
 export default function SettingsPage() {
-  const { user, logout } = useAuth()
-  const [banks, setBanks] = useState<Bank[]>([])
-  const [newBankName, setNewBankName] = useState('')
-  const [newBankCode, setNewBankCode] = useState('')
-  const [activity, setActivity] = useState<{ id: string; action: string; created_at: string; details: Record<string, unknown> | null }[]>([])
-  const [exporting, setExporting] = useState(false)
-
-  useEffect(() => {
-    api.get('/banks').then(r => setBanks(r.data))
-    api.get('/activity').then(r => setActivity(r.data.items))
-  }, [])
-
-  async function addBank() {
-    if (!newBankName.trim()) return
-    const res = await api.post('/banks', { name: newBankName, short_code: newBankCode || undefined })
-    setBanks(b => [...b, res.data])
-    setNewBankName('')
-    setNewBankCode('')
-  }
-
-  async function toggleBank(bank: Bank) {
-    const res = await api.put(`/banks/${bank.id}`, { is_active: !bank.is_active })
-    setBanks(b => b.map(x => x.id === bank.id ? res.data : x))
-  }
-
-  async function handleExport() {
-    setExporting(true)
-    try {
-      const res = await axios.get('/api/v1/export/csv', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        responseType: 'blob',
-      })
-      const url = URL.createObjectURL(res.data)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'why-so-broke-export.csv'
-      a.click()
-      URL.revokeObjectURL(url)
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  const cls = "border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+  const [active, setActive] = useState<Panel>('profile')
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Settings</h2>
+    <div>
+      <h2 className="text-[20px] font-medium mb-5" style={{ color: 'var(--text)' }}>Settings</h2>
 
-      {/* Account */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Account</h3>
-        <p className="text-sm text-gray-600">Signed in as <strong>{user?.display_name || user?.username}</strong></p>
-        <button onClick={logout} className="mt-3 text-sm text-red-500 hover:underline">Sign out</button>
+      {/* Mobile: horizontal scrollable pill tabs */}
+      <div className="flex overflow-x-auto gap-1.5 pb-2 mb-4 sm:hidden">
+        {NAV_GROUPS.flatMap(g => g.items).map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActive(item.id)}
+            className="flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors whitespace-nowrap"
+            style={{
+              background: active === item.id ? 'var(--gl)' : 'var(--surface)',
+              borderColor: active === item.id ? 'var(--green)' : 'var(--border)',
+              color: active === item.id ? 'var(--green)' : 'var(--text2)',
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      {/* Export */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-1">Export Data</h3>
-        <p className="text-xs text-gray-500 mb-3">Download all your transactions as a CSV file.</p>
-        <button onClick={handleExport} disabled={exporting} className="bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
-          {exporting ? 'Exporting...' : 'Export CSV'}
-        </button>
-      </div>
-
-      {/* Banks */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Manage Banks</h3>
-        <div className="space-y-2 mb-4">
-          {banks.map(bank => (
-            <div key={bank.id} className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${bank.is_active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>{bank.name}</p>
-                {bank.short_code && <p className="text-xs text-gray-400">{bank.short_code}</p>}
-              </div>
-              <button onClick={() => toggleBank(bank)} className={`text-xs px-2 py-1 rounded ${bank.is_active ? 'text-red-500 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}>
-                {bank.is_active ? 'Deactivate' : 'Activate'}
-              </button>
+      <div className="flex flex-col sm:flex-row sm:gap-6">
+        {/* Desktop: left sidebar nav */}
+        <nav className="hidden sm:block w-44 shrink-0">
+          {NAV_GROUPS.map(group => (
+            <div key={group.label} className="mb-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 px-3" style={{ color: 'var(--text3)' }}>
+                {group.label}
+              </p>
+              {group.items.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => setActive(item.id)}
+                  className="w-full text-left px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors"
+                  style={{
+                    background: active === item.id ? 'var(--gl)' : 'transparent',
+                    color: active === item.id ? 'var(--green)' : 'var(--text2)',
+                    fontWeight: active === item.id ? 500 : 400,
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
           ))}
-        </div>
-        <div className="flex gap-2">
-          <input type="text" value={newBankName} onChange={e => setNewBankName(e.target.value)} placeholder="Bank name" className={`flex-1 ${cls}`} />
-          <input type="text" value={newBankCode} onChange={e => setNewBankCode(e.target.value)} placeholder="Code" className={`w-20 ${cls}`} />
-          <button onClick={addBank} className="bg-green-600 text-white rounded-lg px-3 py-2 hover:bg-green-700">
-            <PlusIcon className="w-4 h-4" />
-          </button>
+        </nav>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          {PANELS[active]}
         </div>
       </div>
-
-      {/* Activity log */}
-      {activity.length > 0 && (
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Recent Activity</h3>
-          <div className="space-y-2">
-            {activity.map(a => (
-              <div key={a.id} className="flex items-center justify-between">
-                <p className="text-sm text-gray-700">{a.action.replace(/_/g, ' ')}</p>
-                <p className="text-xs text-gray-400">{formatDateTime(a.created_at)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

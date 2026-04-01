@@ -1,20 +1,71 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { transactionsApi } from '../api/transactions'
-import { Transaction, TransactionListResponse } from '../types'
-import { useFilterStore } from '../store/filterStore'
-import { formatDate, formatAmount } from '../utils/formatters'
-import { CATEGORIES, MODES, TYPES, TYPE_COLORS } from '../utils/constants'
+import { categoriesApi } from '../api/categories'
+import { modesApi } from '../api/modes'
+import { Transaction } from '../types'
+import { formatAmount } from '../utils/formatters'
+import { getCategoryChip, TYPES } from '../utils/constants'
 import { PlusIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import DropdownMenu from '../components/ui/DropdownMenu'
+import FilterPanel from '../components/transactions/FilterPanel'
+import ConfirmModal from '../components/ui/ConfirmModal'
 import api from '../api/client'
+import dayjs from 'dayjs'
 
-function TransactionForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+type TxView = 'month' | '3months' | 'year'
+
+function getViewDates(view: TxView): { date_from: string; date_to: string } {
+  const today = dayjs()
+  if (view === 'month') return {
+    date_from: today.startOf('month').format('YYYY-MM-DD'),
+    date_to: today.format('YYYY-MM-DD'),
+  }
+  if (view === '3months') return {
+    date_from: today.subtract(90, 'day').format('YYYY-MM-DD'),
+    date_to: today.format('YYYY-MM-DD'),
+  }
+  // year
+  return {
+    date_from: today.startOf('year').format('YYYY-MM-DD'),
+    date_to: today.format('YYYY-MM-DD'),
+  }
+}
+
+// ─── Transaction Form ────────────────────────────────────────────────────────
+
+function TransactionForm({
+  onClose, onSaved, initial,
+}: {
+  onClose: () => void; onSaved: () => void; initial?: Transaction
+}) {
   const [banks, setBanks] = useState<{ id: string; name: string }[]>([])
-  const [form, setForm] = useState({ date: '', type: 'expense', description: '', category: 'Food & Dining', amount: '', bank_id: '', transfer_to_bank_id: '', mode: 'UPI', notes: '' })
+  const [categories, setCategories] = useState<string[]>([])
+  const [modes, setModes] = useState<string[]>([])
+  const [form, setForm] = useState({
+    date: initial?.date || '',
+    type: initial?.type || 'expense',
+    description: initial?.description || '',
+    category: initial?.category || '',
+    amount: initial?.amount || '',
+    bank_id: initial?.bank_id || '',
+    transfer_to_bank_id: initial?.transfer_to_bank_id || '',
+    mode: initial?.mode || '',
+    notes: initial?.notes || '',
+  })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    api.get('/banks').then((r) => setBanks(r.data))
+    api.get('/banks').then(r => setBanks(r.data))
+    categoriesApi.list().then(r => {
+      setCategories(r.data.map(c => c.name))
+      if (!initial?.category) setForm(f => ({ ...f, category: r.data[0]?.name || '' }))
+    })
+    modesApi.list().then(r => {
+      setModes(r.data.map(m => m.name))
+      if (!initial?.mode) setForm(f => ({ ...f, mode: r.data[0]?.name || '' }))
+    })
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -22,9 +73,13 @@ function TransactionForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
     setSaving(true)
     setError('')
     try {
-      await transactionsApi.create(form as Parameters<typeof transactionsApi.create>[0])
-      onSaved()
-      onClose()
+      const payload = { ...form, bank_id: form.bank_id || null, transfer_to_bank_id: form.transfer_to_bank_id || null, notes: form.notes || null }
+      if (initial) {
+        await transactionsApi.update(initial.id, payload as Parameters<typeof transactionsApi.update>[1])
+      } else {
+        await transactionsApi.create(payload as Parameters<typeof transactionsApi.create>[0])
+      }
+      onSaved(); onClose()
     } catch (err: unknown) {
       setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to save')
     } finally {
@@ -32,41 +87,44 @@ function TransactionForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
     }
   }
 
-  const field = (label: string, children: React.ReactNode) => (
+  const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
+  const fiStyle = { background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }
+  const field = (label: string, child: React.ReactNode) => (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-      {children}
+      <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>{label}</label>
+      {child}
     </div>
   )
-  const cls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
-      <div className="bg-white rounded-t-2xl md:rounded-2xl w-full max-w-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Add Transaction</h3>
-          <button onClick={onClose}><XMarkIcon className="w-5 h-5 text-gray-500" /></button>
+    <div className="fixed inset-0 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto" style={{ background: 'rgba(0,0,0,0.4)' }}>
+      <div className="rounded-xl border p-4 sm:p-6 w-[480px] max-w-full my-auto" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-[16px] font-medium" style={{ color: 'var(--text)' }}>{initial ? 'Edit transaction' : 'Add transaction'}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}>
+            <XMarkIcon className="w-4 h-4" />
+          </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            {field('Date', <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className={cls} required />)}
-            {field('Type', <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className={cls}>{TYPES.map(t => <option key={t}>{t}</option>)}</select>)}
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {field('Date', <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={fi} style={fiStyle} required />)}
+            {field('Type', <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as 'expense' | 'income' | 'transfer' })} className={fi} style={fiStyle} disabled={!!initial}>{TYPES.map(t => <option key={t}>{t}</option>)}</select>)}
           </div>
-          {field('Description', <input type="text" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={cls} required />)}
-          <div className="grid grid-cols-2 gap-3">
-            {field('Category', <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className={cls}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select>)}
-            {field('Amount (₹)', <input type="number" step="0.01" min="0.01" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className={cls} required />)}
+          {field('Description', <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={fi} style={fiStyle} placeholder="e.g. Swiggy order" required />)}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {field('Category', <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={fi} style={fiStyle}>{categories.map(c => <option key={c}>{c}</option>)}</select>)}
+            {field('Amount (₹)', <input type="number" step="0.01" min="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={fi} style={fiStyle} placeholder="0.00" required />)}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {field('Bank', <select value={form.bank_id} onChange={e => setForm({...form, bank_id: e.target.value})} className={cls}><option value="">Select bank</option>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>)}
-            {field('Mode', <select value={form.mode} onChange={e => setForm({...form, mode: e.target.value})} className={cls}>{MODES.map(m => <option key={m}>{m}</option>)}</select>)}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {field('Bank', <select value={form.bank_id} onChange={e => setForm({ ...form, bank_id: e.target.value })} className={fi} style={fiStyle}><option value="">Select bank…</option>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>)}
+            {field('Mode', <select value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value })} className={fi} style={fiStyle}>{modes.map(m => <option key={m}>{m}</option>)}</select>)}
           </div>
-          {form.type === 'transfer' && field('To Bank', <select value={form.transfer_to_bank_id} onChange={e => setForm({...form, transfer_to_bank_id: e.target.value})} className={cls}><option value="">Select destination bank</option>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>)}
-          {field('Notes (optional)', <input type="text" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className={cls} />)}
-          {error && <p className="text-xs text-red-600">{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 border border-gray-300 rounded-lg py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-            <button type="submit" disabled={saving} className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-green-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
+          {form.type === 'transfer' && !initial && field('To Bank', <select value={form.transfer_to_bank_id} onChange={e => setForm({ ...form, transfer_to_bank_id: e.target.value })} className={fi} style={fiStyle}><option value="">Select destination bank…</option>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>)}
+          {field('Notes (optional)', <input type="text" value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} className={fi} style={fiStyle} placeholder="Any extra details…" />)}
+          {error && <p className="text-[12px] text-red-500">{error}</p>}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button type="button" onClick={onClose} className="py-2.5 rounded-md text-[13px] border" style={{ borderColor: 'var(--border2)', color: 'var(--text2)', background: 'var(--surface)' }}>Cancel</button>
+            <button type="submit" disabled={saving} className="py-2.5 rounded-md text-[13px] text-white disabled:opacity-50" style={{ background: 'var(--green)' }}>{saving ? 'Saving…' : 'Save'}</button>
           </div>
         </form>
       </div>
@@ -74,95 +132,389 @@ function TransactionForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
   )
 }
 
+// ─── Category Chip ───────────────────────────────────────────────────────────
+
+function CategoryChip({ name }: { name: string }) {
+  const chip = getCategoryChip(name)
+  return (
+    <span
+      className="inline-block text-[10px] px-1.5 py-0.5 rounded-full ml-1.5"
+      style={{ background: chip.bg, color: chip.text, border: `0.5px solid ${chip.border}` }}
+    >
+      {name}
+    </span>
+  )
+}
+
+// ─── Transaction Row ─────────────────────────────────────────────────────────
+
+function TxRow({ tx, onEdit, onDelete }: { tx: Transaction; onEdit: () => void; onDelete: () => void }) {
+  const bankLabel = tx.bank?.short_code || tx.bank?.name || ''
+  const subtitle = [bankLabel, tx.mode].filter(Boolean).join(' · ')
+
+  return (
+    <div className="flex items-center gap-3 px-3.5 py-2.5 border rounded-md mb-1.5 cursor-default transition-colors"
+      style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border2)')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center flex-wrap">
+          <span className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{tx.description}</span>
+          <CategoryChip name={tx.category} />
+        </div>
+        <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>{subtitle}</p>
+      </div>
+      <span className="text-[14px] font-medium flex-shrink-0" style={{ color: tx.type === 'income' ? 'var(--green)' : 'var(--text)' }}>
+        {tx.type === 'income' ? '+' : ''}{formatAmount(tx.amount)}
+      </span>
+      <DropdownMenu
+        items={[
+          { label: 'Edit', onClick: onEdit },
+          { label: 'Delete', onClick: onDelete, variant: 'danger' },
+        ]}
+      />
+    </div>
+  )
+}
+
+// ─── Group Header ────────────────────────────────────────────────────────────
+
+function GroupHeader({ label, total }: { label: string; total: number }) {
+  return (
+    <div className="flex justify-between text-[11px] font-medium uppercase tracking-[0.5px] pb-2 mb-1.5 border-b"
+      style={{ color: 'var(--text3)', borderColor: 'var(--border)' }}>
+      <span>{label}</span>
+      <span>{formatAmount(total)}</span>
+    </div>
+  )
+}
+
+// ─── Main Page ───────────────────────────────────────────────────────────────
+
+const VIEW_LABELS: Record<TxView, string> = {
+  month: 'This month',
+  '3months': '3 months',
+  year: 'This year',
+}
+
 export default function TransactionsPage() {
-  const { filters, setFilter, clearFilters } = useFilterStore()
-  const [data, setData] = useState<TransactionListResponse | null>(null)
-  const [page, setPage] = useState(1)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const importJobId = searchParams.get('import_job_id') || undefined
+
+  // Local panel filters — intentionally NOT using the global filterStore to avoid
+  // bleeding in dates set by DashboardPage or other pages.
+  const [panelFilters, setPanelFilters] = useState<{ date_from?: string; date_to?: string; category?: string; bank_id?: string; mode?: string; type?: string }>({})
+  const [activeFilterCount, setActiveFilterCount] = useState(0)
+
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [editTx, setEditTx] = useState<Transaction | null>(null)
+  const [deleteTx, setDeleteTx] = useState<Transaction | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [view, setView] = useState<TxView>('month')
+  const [drillMonth, setDrillMonth] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [categories, setCategories] = useState<string[]>([])
+  const [modes, setModes] = useState<string[]>([])
+  const [banks, setBanks] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    categoriesApi.list().then(r => setCategories(r.data.map(c => c.name)))
+    modesApi.list().then(r => setModes(r.data.map(m => m.name)))
+    api.get('/banks').then(r => setBanks(r.data))
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await transactionsApi.list({ ...filters, page, per_page: 50 })
-      setData(res.data)
+      // Priority: drilldown > explicit panel date > view pill date
+      const dates = importJobId
+        ? {}
+        : drillMonth
+          ? { date_from: `${drillMonth}-01`, date_to: dayjs(`${drillMonth}-01`).endOf('month').format('YYYY-MM-DD') }
+          : (panelFilters.date_from || panelFilters.date_to)
+            ? {}
+            : getViewDates(view)
+      const res = await transactionsApi.list({
+        ...panelFilters,
+        ...dates,
+        description: search || undefined,
+        import_job_id: importJobId,
+        per_page: 500,
+      })
+      setTransactions(res.data.items)
     } finally {
       setLoading(false)
     }
-  }, [filters, page])
+  }, [view, drillMonth, panelFilters, search, importJobId])
 
-  useEffect(() => { setPage(1) }, [filters])
   useEffect(() => { fetchData() }, [fetchData])
 
-  const cls = "border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+  function handleViewChange(v: TxView) {
+    setView(v)
+    setDrillMonth(null)
+    setPanelFilters({})
+    setActiveFilterCount(0)
+  }
+
+  async function handleDelete(tx: Transaction) {
+    setDeleteTx(tx)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTx) return
+    await transactionsApi.delete(deleteTx.id)
+    setDeleteTx(null)
+    fetchData()
+  }
+
+  function handleApplyFilters(f: typeof panelFilters) {
+    setPanelFilters(f)
+    // date_from + date_to together count as 1 filter row
+    const count = [
+      f.date_from || f.date_to,
+      f.category,
+      f.bank_id,
+      f.mode,
+      f.type,
+    ].filter(Boolean).length
+    setActiveFilterCount(count)
+  }
+
+  // ── Group transactions ─────────────────────────────────────────────────────
+
+  const grouped = useMemo(() => {
+    const effectiveView = drillMonth ? '3months' : view
+
+    if (effectiveView === 'month') {
+      // Group by exact date
+      const map = new Map<string, Transaction[]>()
+      for (const tx of transactions) {
+        const key = tx.date
+        if (!map.has(key)) map.set(key, [])
+        map.get(key)!.push(tx)
+      }
+      return Array.from(map.entries()).map(([date, txs]) => ({
+        label: dayjs(date).format('ddd, DD MMM YYYY'),
+        txs,
+        total: txs.reduce((s, t) => s + (t.type === 'expense' ? +t.amount : 0), 0),
+      }))
+    }
+
+    if (effectiveView === '3months') {
+      // Group by YYYY-MM
+      const map = new Map<string, Transaction[]>()
+      for (const tx of transactions) {
+        const key = tx.date.slice(0, 7)
+        if (!map.has(key)) map.set(key, [])
+        map.get(key)!.push(tx)
+      }
+      return Array.from(map.entries()).map(([month, txs]) => ({
+        label: dayjs(`${month}-01`).format('MMMM YYYY'),
+        txs,
+        total: txs.reduce((s, t) => s + (t.type === 'expense' ? +t.amount : 0), 0),
+      }))
+    }
+
+    return []
+  }, [transactions, view, drillMonth])
+
+  // Year view: month summary rows
+  const yearMonths = useMemo(() => {
+    if ((drillMonth ? '3months' : view) !== 'year') return []
+    const map = new Map<string, { count: number; total: number }>()
+    for (const tx of transactions) {
+      const key = tx.date.slice(0, 7)
+      if (!map.has(key)) map.set(key, { count: 0, total: 0 })
+      const entry = map.get(key)!
+      entry.count++
+      if (tx.type === 'expense') entry.total += +tx.amount
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([month, { count, total }]) => ({
+        month,
+        label: dayjs(`${month}-01`).format('MMMM YYYY'),
+        count,
+        total,
+      }))
+  }, [transactions, view, drillMonth])
+
+  const isYearView = !drillMonth && view === 'year'
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">Transactions</h2>
-        <div className="flex gap-2">
-          <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">
-            <FunnelIcon className="w-4 h-4" /> Filters
-          </button>
-          <button onClick={() => setShowForm(true)} className="flex items-center gap-1 bg-green-600 text-white rounded-lg px-3 py-2 text-sm font-semibold hover:bg-green-700">
-            <PlusIcon className="w-4 h-4" /> Add
-          </button>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Transactions</h2>
+          {importJobId ? (
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-[11px] px-2 py-0.5 rounded-full border" style={{ background: 'var(--gl)', borderColor: 'var(--green)', color: 'var(--green)' }}>
+                Filtered by import job
+              </span>
+              <button
+                onClick={() => setSearchParams({})}
+                className="text-[11px] flex items-center gap-0.5"
+                style={{ color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <XMarkIcon className="w-3 h-3" /> Clear
+              </button>
+            </div>
+          ) : (
+            <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>All recorded transactions</p>
+          )}
         </div>
+        <button
+          onClick={() => { setEditTx(null); setShowForm(true) }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] text-white"
+          style={{ background: 'var(--green)' }}
+        >
+          <PlusIcon className="w-3.5 h-3.5" /> Add
+        </button>
       </div>
 
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="text"
+          placeholder="Search transactions…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-[160px] px-3 py-1.5 rounded-md border text-[13px] outline-none transition-colors focus:border-[var(--green)]"
+          style={{ background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }}
+        />
+        <div className="flex items-center gap-1">
+          {(Object.keys(VIEW_LABELS) as TxView[]).map(v => (
+            <button
+              key={v}
+              onClick={() => handleViewChange(v)}
+              className="px-3 py-1.5 rounded-full text-[12px] border transition-all"
+              style={view === v
+                ? { background: 'var(--surface)', color: 'var(--green)', fontWeight: 500, borderColor: 'var(--border)' }
+                : { background: 'transparent', color: 'var(--text2)', borderColor: 'transparent' }
+              }
+            >
+              {VIEW_LABELS[v]}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-[13px] transition-colors"
+          style={{
+            borderColor: activeFilterCount > 0 ? 'var(--green)' : 'var(--border2)',
+            background: activeFilterCount > 0 ? 'var(--gl)' : 'var(--surface)',
+            color: activeFilterCount > 0 ? 'var(--green)' : 'var(--text2)',
+          }}
+        >
+          <FunnelIcon className="w-3.5 h-3.5" />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full text-[10px] font-medium text-white" style={{ background: 'var(--green)' }}>
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Compound filter panel */}
       {showFilters && (
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div><label className="block text-xs text-gray-500 mb-1">From</label><input type="date" value={filters.date_from || ''} onChange={e => setFilter('date_from', e.target.value)} className={cls} /></div>
-          <div><label className="block text-xs text-gray-500 mb-1">To</label><input type="date" value={filters.date_to || ''} onChange={e => setFilter('date_to', e.target.value)} className={cls} /></div>
-          <div><label className="block text-xs text-gray-500 mb-1">Type</label><select value={filters.type || ''} onChange={e => setFilter('type', e.target.value)} className={cls}><option value="">All</option>{TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
-          <div><label className="block text-xs text-gray-500 mb-1">Category</label><select value={filters.category || ''} onChange={e => setFilter('category', e.target.value)} className={cls}><option value="">All</option>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></div>
-          <div><label className="block text-xs text-gray-500 mb-1">Mode</label><select value={filters.mode || ''} onChange={e => setFilter('mode', e.target.value)} className={cls}><option value="">All</option>{MODES.map(m => <option key={m}>{m}</option>)}</select></div>
-          <div><label className="block text-xs text-gray-500 mb-1">Min ₹</label><input type="number" value={filters.amount_min || ''} onChange={e => setFilter('amount_min', e.target.value)} className={cls} /></div>
-          <div><label className="block text-xs text-gray-500 mb-1">Max ₹</label><input type="number" value={filters.amount_max || ''} onChange={e => setFilter('amount_max', e.target.value)} className={cls} /></div>
-          <div className="flex items-end"><button onClick={clearFilters} className="w-full border border-gray-300 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Clear</button></div>
+        <FilterPanel
+          categories={categories}
+          modes={modes}
+          banks={banks}
+          initialFilters={panelFilters}
+          onApply={handleApplyFilters}
+          onClose={() => setShowFilters(false)}
+          activeCount={activeFilterCount}
+        />
+      )}
+
+      {/* Drilldown breadcrumb */}
+      {drillMonth && (
+        <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--text3)' }}>
+          <button onClick={() => setDrillMonth(null)} className="underline" style={{ color: 'var(--green)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            ← Back to year
+          </button>
+          <span>/ {dayjs(`${drillMonth}-01`).format('MMMM YYYY')}</span>
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="divide-y divide-gray-100">
-            {[1,2,3,4,5].map(i => <div key={i} className="p-4 animate-pulse"><div className="h-4 bg-gray-100 rounded w-3/4" /></div>)}
-          </div>
-        ) : data?.items.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-gray-400 text-sm">No transactions yet.</p>
-            <button onClick={() => setShowForm(true)} className="mt-2 text-green-600 text-sm font-medium hover:underline">Add your first transaction →</button>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {data?.items.map((tx) => (
-              <div key={tx.id} className="flex items-center px-4 py-3 hover:bg-gray-50">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{tx.description}</p>
-                  <p className="text-xs text-gray-500">{formatDate(tx.date)} · {tx.category} · {tx.mode}</p>
-                </div>
-                <div className="text-right ml-3">
-                  <p className={`text-sm font-semibold ${TYPE_COLORS[tx.type]}`}>
-                    {tx.type === 'income' ? '+' : '-'}{formatAmount(tx.amount)}
-                  </p>
-                  <p className="text-xs text-gray-400">{tx.bank?.short_code || tx.bank?.name || '—'}</p>
-                </div>
+      {/* Transaction list */}
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-14 rounded-md animate-pulse" style={{ background: 'var(--border)' }} />
+          ))}
+        </div>
+      ) : transactions.length === 0 ? (
+        <div className="py-12 text-center">
+          <p className="text-[13px]" style={{ color: 'var(--text3)' }}>No transactions found.</p>
+          <button onClick={() => { setEditTx(null); setShowForm(true) }} className="mt-1 text-[13px] underline" style={{ color: 'var(--green)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            Add your first transaction →
+          </button>
+        </div>
+      ) : isYearView ? (
+        // Year view: month summary rows
+        <div className="space-y-1.5">
+          {yearMonths.map(({ month, label, count, total }) => (
+            <div
+              key={month}
+              onClick={() => setDrillMonth(month)}
+              className="flex items-center gap-3 px-3.5 py-2.5 border rounded-md cursor-pointer transition-colors"
+              style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border2)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+            >
+              <div className="flex-1">
+                <span className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{label}</span>
+                <span className="text-[11px] ml-2" style={{ color: 'var(--text3)' }}>{count} transaction{count !== 1 ? 's' : ''}</span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {data && data.pages > 1 && (
-        <div className="flex justify-center gap-2">
-          <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 border rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50">← Prev</button>
-          <span className="px-3 py-1.5 text-sm text-gray-600">{page} / {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 border rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50">Next →</button>
+              <span className="text-[14px] font-medium" style={{ color: 'var(--text)' }}>{formatAmount(total)}</span>
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--text3)', flexShrink: 0 }}>
+                <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          ))}
+        </div>
+      ) : (
+        // Month / 3months view: grouped by day or month
+        <div className="space-y-5">
+          {grouped.map(({ label, txs, total }) => (
+            <div key={label}>
+              <GroupHeader label={label} total={total} />
+              {txs.map(tx => (
+                <TxRow
+                  key={tx.id}
+                  tx={tx}
+                  onEdit={() => { setEditTx(tx); setShowForm(true) }}
+                  onDelete={() => handleDelete(tx)}
+                />
+              ))}
+            </div>
+          ))}
         </div>
       )}
 
-      {showForm && <TransactionForm onClose={() => setShowForm(false)} onSaved={fetchData} />}
+      {showForm && (
+        <TransactionForm
+          onClose={() => { setShowForm(false); setEditTx(null) }}
+          onSaved={fetchData}
+          initial={editTx || undefined}
+        />
+      )}
+
+      <ConfirmModal
+        open={!!deleteTx}
+        title={`Delete "${deleteTx?.description}"`}
+        description={deleteTx?.transfer_group_id ? 'Both transfer rows will be deleted.' : undefined}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTx(null)}
+      />
     </div>
   )
 }

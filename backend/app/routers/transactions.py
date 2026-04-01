@@ -5,11 +5,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
 from app.models.transaction import Transaction
+from app.models.category import Category
+from app.models.mode import Mode
+from app.models.bank import Bank
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionOut, TransactionListResponse
 from app.services import activity_service
 
@@ -34,7 +38,33 @@ def build_filter(current_user: User, **kwargs):
         conditions.append(Transaction.mode == kwargs["mode"])
     if kwargs.get("type"):
         conditions.append(Transaction.type == kwargs["type"])
+    if kwargs.get("import_job_id"):
+        conditions.append(Transaction.import_job_id == kwargs["import_job_id"])
     return conditions
+
+
+async def _validate_category(db: AsyncSession, user_id: uuid.UUID, category: str) -> None:
+    result = await db.execute(
+        select(Category).where(Category.user_id == user_id, Category.name == category)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=422, detail=f"Invalid category: {category}")
+
+
+async def _bank_name(db: AsyncSession, bank_id: uuid.UUID | None) -> str | None:
+    if not bank_id:
+        return None
+    result = await db.execute(select(Bank).where(Bank.id == bank_id))
+    bank = result.scalar_one_or_none()
+    return bank.name if bank else None
+
+
+async def _validate_mode(db: AsyncSession, user_id: uuid.UUID, mode: str) -> None:
+    result = await db.execute(
+        select(Mode).where(Mode.user_id == user_id, Mode.name == mode)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=422, detail=f"Invalid mode: {mode}")
 
 
 @router.get("", response_model=TransactionListResponse)
@@ -47,8 +77,10 @@ async def list_transactions(
     bank_id: Optional[uuid.UUID] = Query(None),
     mode: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
+    description: Optional[str] = Query(None),
+    import_job_id: Optional[uuid.UUID] = Query(None),
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=200),
+    per_page: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -57,7 +89,10 @@ async def list_transactions(
         date_from=date_from, date_to=date_to,
         amount_min=amount_min, amount_max=amount_max,
         category=category, bank_id=bank_id, mode=mode, type=type,
+        import_job_id=import_job_id,
     )
+    if description:
+        conditions.append(Transaction.description.ilike(f"%{description}%"))
     total_result = await db.execute(select(func.count()).select_from(Transaction).where(and_(*conditions)))
     total = total_result.scalar_one()
 
@@ -76,7 +111,7 @@ async def list_transactions(
         items=items,
         total=total,
         page=page,
-        pages=-(-total // per_page),  # ceiling division
+        pages=-(-total // per_page),
     )
 
 
@@ -86,6 +121,9 @@ async def create_transaction(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    await _validate_category(db, current_user.id, body.category)
+    await _validate_mode(db, current_user.id, body.mode)
+
     if body.type == "transfer":
         if not body.transfer_to_bank_id:
             raise HTTPException(status_code=400, detail="transfer_to_bank_id required for transfers")
@@ -107,23 +145,53 @@ async def create_transaction(
         db.add(tx1)
         db.add(tx2)
         await db.flush()
-        await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx1.id)
+        bank_name = await _bank_name(db, body.bank_id)
+        to_bank_name = await _bank_name(db, body.transfer_to_bank_id)
+        await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx1.id, {
+            "description": body.description,
+            "amount": float(body.amount),
+            "category": body.category,
+            "bank_name": bank_name,
+            "to_bank_name": to_bank_name,
+            "mode": body.mode,
+            "type": body.type,
+        })
         await db.commit()
-        await db.refresh(tx1)
-        return tx1
-    else:
-        tx = Transaction(
-            user_id=current_user.id, date=body.date, type=body.type,
-            description=body.description, category=body.category,
-            amount=body.amount, bank_id=body.bank_id,
-            mode=body.mode, notes=body.notes,
+        result = await db.execute(
+            select(Transaction)
+            .options(selectinload(Transaction.bank), selectinload(Transaction.transfer_to_bank))
+            .where(Transaction.id == tx1.id)
         )
-        db.add(tx)
-        await db.flush()
-        await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx.id)
-        await db.commit()
-        await db.refresh(tx)
-        return tx
+        return result.scalar_one()
+    else:
+        try:
+            tx = Transaction(
+                user_id=current_user.id, date=body.date, type=body.type,
+                description=body.description, category=body.category,
+                amount=body.amount, bank_id=body.bank_id,
+                mode=body.mode, notes=body.notes,
+            )
+            db.add(tx)
+            await db.flush()
+            bank_name = await _bank_name(db, body.bank_id)
+            await activity_service.log(db, current_user.id, "transaction_created", "transaction", tx.id, {
+                "description": body.description,
+                "amount": float(body.amount),
+                "category": body.category,
+                "bank_name": bank_name,
+                "mode": body.mode,
+                "type": body.type,
+            })
+            await db.commit()
+            result = await db.execute(
+                select(Transaction)
+                .options(selectinload(Transaction.bank), selectinload(Transaction.transfer_to_bank))
+                .where(Transaction.id == tx.id)
+            )
+            return result.scalar_one()
+        except IntegrityError:
+            await db.rollback()
+            raise HTTPException(status_code=409, detail="A transaction with the same date, amount, category, and mode already exists")
 
 
 @router.put("/{transaction_id}", response_model=TransactionOut)
@@ -143,6 +211,11 @@ async def update_transaction(
         raise HTTPException(status_code=404, detail="Transaction not found")
     if tx.type == "transfer":
         raise HTTPException(status_code=400, detail="Cannot edit transfer transactions directly. Delete and recreate.")
+
+    if body.category is not None:
+        await _validate_category(db, current_user.id, body.category)
+    if body.mode is not None:
+        await _validate_mode(db, current_user.id, body.mode)
 
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(tx, field, value)
@@ -166,7 +239,6 @@ async def delete_transaction(
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     if tx.transfer_group_id:
-        # Delete both linked transfer rows
         await db.execute(
             delete(Transaction).where(
                 Transaction.transfer_group_id == tx.transfer_group_id,

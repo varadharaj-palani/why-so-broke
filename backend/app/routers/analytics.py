@@ -9,7 +9,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
 from app.models.transaction import Transaction
-from app.schemas.analytics import SummaryOut, CategoryBreakdown, MonthlyTrendItem, ModeBreakdown
+from app.schemas.analytics import SummaryOut, CategoryBreakdown, MonthlyTrendItem, ModeBreakdown, DailySpendItem
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -121,6 +121,29 @@ async def monthly_trend(
     )
     rows = result.all()
     return [MonthlyTrendItem(month=r.month, income=r.income or 0, expense=r.expense or 0) for r in reversed(rows)]
+
+
+@router.get("/daily-spend", response_model=list[DailySpendItem])
+async def daily_spend(
+    date_from: date = Query(...),
+    date_to: date = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Transaction.date, func.sum(Transaction.amount).label("total"))
+        .where(
+            and_(
+                Transaction.user_id == current_user.id,
+                Transaction.type == "expense",
+                Transaction.date >= date_from,
+                Transaction.date <= date_to,
+            )
+        )
+        .group_by(Transaction.date)
+        .order_by(Transaction.date)
+    )
+    return [DailySpendItem(date=row.date, total=row.total) for row in result]
 
 
 @router.get("/by-mode", response_model=list[ModeBreakdown])

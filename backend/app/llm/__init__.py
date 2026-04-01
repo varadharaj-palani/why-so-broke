@@ -1,13 +1,7 @@
-from app.llm.base import LLMProvider
+from app.llm.ai_provider import AiProvider, MODEL_MAP
 from app.config import settings
 
 
-def get_llm_provider() -> LLMProvider:
-    if settings.LLM_PROVIDER == "claude":
-        from app.llm.claude_provider import ClaudeProvider
-        return ClaudeProvider()
-    elif settings.LLM_PROVIDER == "openai":
-        from app.llm.openai_provider import OpenAIProvider
-        return OpenAIProvider()
-    else:
-        raise ValueError(f"Unknown LLM_PROVIDER: {settings.LLM_PROVIDER}")
+def get_llm_provider() -> AiProvider:
+    model = MODEL_MAP.get(settings.LLM_PROVIDER, "google-gla:gemini-2.5-flash")
+    return AiProvider(model)

@@ -11,7 +11,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tracker}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tracker} -d ${POSTGRES_DB:-why_so_broke}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,9 +22,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-tracker}:${DB_PASSWORD:-tracker_dev}@db:5432/why_so_broke
       DATABASE_SYNC_URL: postgresql+psycopg2://${DB_USER:-tracker}:${DB_PASSWORD:-tracker_dev}@db:5432/why_so_broke
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      LLM_PROVIDER: ${LLM_PROVIDER:-claude}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:

@@ -7,6 +7,7 @@ from app.deps import get_current_user
 from app.models.user import User
 from app.models.bank import Bank
 from app.schemas.bank import BankCreate, BankUpdate, BankOut
+from app.services import activity_service
 
 router = APIRouter(prefix="/banks", tags=["banks"])
 
@@ -17,7 +18,7 @@ async def list_banks(
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(Bank).where(Bank.user_id == current_user.id).order_by(Bank.name)
+        select(Bank).where(Bank.user_id == current_user.id, Bank.is_archived == False).order_by(Bank.name)
     )
     return result.scalars().all()
 
@@ -30,6 +31,11 @@ async def create_bank(
 ):
     bank = Bank(user_id=current_user.id, name=body.name, short_code=body.short_code)
     db.add(bank)
+    await db.flush()
+    await activity_service.log(db, current_user.id, "bank_created", "settings", bank.id, {
+        "name": body.name,
+        "short_code": body.short_code,
+    })
     await db.commit()
     await db.refresh(bank)
     return bank
@@ -52,6 +58,11 @@ async def update_bank(
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(bank, field, value)
 
+    await db.flush()
+    await activity_service.log(db, current_user.id, "bank_updated", "settings", bank.id, {
+        "name": bank.name,
+        "short_code": bank.short_code,
+    })
     await db.commit()
     await db.refresh(bank)
     return bank
@@ -69,5 +80,11 @@ async def delete_bank(
     bank = result.scalar_one_or_none()
     if not bank:
         raise HTTPException(status_code=404, detail="Bank not found")
-    await db.delete(bank)
+
+    bank.is_archived = True
+    await db.flush()
+    await activity_service.log(db, current_user.id, "bank_archived", "settings", bank_id, {
+        "name": bank.name,
+        "short_code": bank.short_code,
+    })
     await db.commit()

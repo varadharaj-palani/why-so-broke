@@ -4,6 +4,41 @@
 
 @layer base {
   html {
-    font-family: system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --border: #e8eaed;
+    --border2: #d0d5dd;
+    --text: #111827;
+    --text2: #374151;
+    --text3: #6b7280;
+    --text4: #9ca3af;
+    --green: #1d8a4e;
+    --gl: #f0faf5;
+    --amber: #BA7517;
+    --al: #faeeda;
+  }
+
+  .dark {
+    --bg: #0f0f14;
+    --surface: #18181f;
+    --border: #26263a;
+    --border2: #3a3a52;
+    --text: #f0f0f8;
+    --text2: #9090aa;
+    --text3: #55556a;
+    --text4: #33334a;
+    --green: #4ade80;
+    --gl: #0d2e1a;
+    --amber: #fbbf24;
+    --al: #2a1f00;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
   }
 }

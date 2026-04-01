@@ -1,116 +1,463 @@
+import { useState, useEffect } from 'react'
 import { useAnalytics } from '../hooks/useAnalytics'
 import { useFilterStore } from '../store/filterStore'
-import { formatAmount, currentMonth } from '../utils/formatters'
-import { CATEGORY_COLORS } from '../utils/constants'
+import { analyticsApi } from '../api/analytics'
+import { formatAmount } from '../utils/formatters'
+import { getCategoryColor } from '../utils/constants'
+import { DailySpendItem } from '../types'
+import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import dayjs from 'dayjs'
 import {
-  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer
+  BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 
-function SummaryCard({ label, value, color }: { label: string; value: string; color: string }) {
+type Range = 'month' | '3months' | 'year' | 'all'
+
+function getRangeDates(range: Range): { date_from?: string; date_to?: string } {
+  const today = dayjs()
+  if (range === 'month') return {
+    date_from: today.startOf('month').format('YYYY-MM-DD'),
+    date_to: today.endOf('month').format('YYYY-MM-DD'),
+  }
+  if (range === '3months') return {
+    date_from: today.startOf('month').subtract(2, 'month').format('YYYY-MM-DD'),
+    date_to: today.endOf('month').format('YYYY-MM-DD'),
+  }
+  if (range === 'year') return {
+    date_from: today.startOf('year').format('YYYY-MM-DD'),
+    date_to: today.endOf('month').format('YYYY-MM-DD'),
+  }
+  return {}
+}
+
+const RANGES: { key: Range; label: string }[] = [
+  { key: 'month', label: 'This month' },
+  { key: '3months', label: '3 months' },
+  { key: 'year', label: 'This year' },
+  { key: 'all', label: 'All time' },
+]
+
+const fmtAxis = (v: number) => {
+  if (v >= 100000) return `₹${(v / 100000).toFixed(1).replace(/\.0$/, '')}L`
+  if (v >= 1000)   return `₹${(v / 1000).toFixed(1).replace(/\.0$/, '')}k`
+  return `₹${Math.round(v)}`
+}
+
+export default function DashboardPage() {
+  const [range, setRange] = useState<Range>('month')
+  const { setFilters } = useFilterStore()
+  const trendMonths = range === 'month' ? 1 : range === '3months' ? 3 : range === 'year' ? 12 : 24
+  const { summary, byCategory, trend, byMode, loading } = useAnalytics(trendMonths)
+  const [dailySpend, setDailySpend] = useState<DailySpendItem[]>([])
+  const [dailyLoading, setDailyLoading] = useState(false)
+  const [stale, setStale] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [customDates, setCustomDates] = useState<{ date_from?: string; date_to?: string }>({})
+
+  const rangeDates = customDates.date_from || customDates.date_to ? customDates : getRangeDates(range)
+
+  useEffect(() => {
+    setStale(true)
+    setDailyLoading(true)
+    const dates = customDates.date_from || customDates.date_to ? customDates : getRangeDates(range)
+    setFilters(dates)
+    const from = dates.date_from || dayjs().subtract(2, 'year').format('YYYY-MM-DD')
+    const to = dates.date_to || dayjs().format('YYYY-MM-DD')
+    analyticsApi.dailySpend(from, to)
+      .then(r => setDailySpend(r.data))
+      .catch(() => {})
+      .finally(() => setDailyLoading(false))
+  }, [range, customDates, setFilters])
+
+  // Clear stale once analytics finishes (accounts for 300ms debounce in useAnalytics)
+  useEffect(() => {
+    if (!loading) setStale(false)
+  }, [loading])
+
+  const isTransitioning = stale || loading || dailyLoading
+
+  const netValue = parseFloat(summary?.net || '0')
+  const isDeficit = netValue < 0
+
+  const categoryData = byCategory.map(c => ({ ...c, total: parseFloat(c.total) }))
+  const trendData = trend.map(t => ({ ...t, income: parseFloat(t.income), expense: parseFloat(t.expense) }))
+
+  // Full date range for daily bar chart: day 1 of month → today, zeroing missing days
+  const dailyBarData = (() => {
+    const spendMap = new Map(dailySpend.map(d => [d.date, parseFloat(d.total)]))
+    const from = dayjs().startOf('month')
+    const to = dayjs()
+    const result: { day: string; total: number }[] = []
+    let cur = from
+    while (!cur.isAfter(to)) {
+      result.push({ day: cur.format('D'), total: spendMap.get(cur.format('YYYY-MM-DD')) ?? 0 })
+      cur = cur.add(1, 'day')
+    }
+    return result
+  })()
+
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className={`text-xl font-bold ${color}`}>{formatAmount(value)}</p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Dashboard</h2>
+          <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>Your financial overview</p>
+        </div>
+        <div className="flex gap-2 self-start">
+          <div className="flex gap-1 p-1 rounded-full border" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+            {RANGES.map(r => (
+              <button
+                key={r.key}
+                onClick={() => { setRange(r.key); setCustomDates({}) }}
+                className="px-2.5 py-1.5 rounded-full text-[11px] sm:text-[12px] sm:px-3 transition-all whitespace-nowrap"
+                style={range === r.key && !customDates.date_from && !customDates.date_to
+                  ? { background: 'var(--surface)', color: 'var(--green)', fontWeight: 500, border: '0.5px solid var(--border)' }
+                  : { color: 'var(--text2)', border: '0.5px solid transparent' }
+                }
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="px-3 py-1.5 rounded-md border text-[13px] transition-colors flex items-center gap-1.5"
+            style={{
+              borderColor: customDates.date_from || customDates.date_to ? 'var(--green)' : 'var(--border2)',
+              background: customDates.date_from || customDates.date_to ? 'var(--gl)' : 'var(--surface)',
+              color: customDates.date_from || customDates.date_to ? 'var(--green)' : 'var(--text2)',
+            }}
+          >
+            <FunnelIcon className="w-3.5 h-3.5" />
+            Custom
+          </button>
+        </div>
+      </div>
+
+      {/* Custom date filter panel */}
+      {showFilters && (
+        <div className="rounded-lg border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>From</label>
+              <input
+                type="date"
+                value={customDates.date_from || ''}
+                onChange={e => setCustomDates({ ...customDates, date_from: e.target.value })}
+                className="w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
+                style={{ background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>To</label>
+              <input
+                type="date"
+                value={customDates.date_to || ''}
+                onChange={e => setCustomDates({ ...customDates, date_to: e.target.value })}
+                className="w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
+                style={{ background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }}
+              />
+            </div>
+          </div>
+          <button
+            onClick={() => { setCustomDates({}); setShowFilters(false) }}
+            className="mt-3 text-[12px] text-blue-600 hover:underline"
+            style={{ color: 'var(--green)' }}
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+
+      {/* All data sections fade together on filter change */}
+      <div className="space-y-5" style={{ opacity: isTransitioning ? 0.45 : 1, transition: 'opacity 0.25s ease' }}>
+
+      {/* Summary — mobile: compact single card with 3 rows */}
+      {loading && !summary ? (
+        <div className="sm:hidden h-[132px] rounded-xl animate-pulse" style={{ background: 'var(--border)' }} />
+      ) : summary && (
+        <div className="sm:hidden rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>Income</p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text4)' }}>{summary.transaction_count} transactions</p>
+            </div>
+            <p className="text-[17px] font-semibold" style={{ color: 'var(--green)' }}>{formatAmount(summary.total_income)}</p>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <p className="text-[11px] font-medium uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>Expenses</p>
+            <p className="text-[17px] font-semibold" style={{ color: 'var(--text)' }}>{formatAmount(summary.total_expense)}</p>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>Net balance</p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text4)' }}>{isDeficit ? 'Deficit this period' : 'Surplus this period'}</p>
+            </div>
+            <p className="text-[17px] font-semibold" style={{ color: isDeficit ? 'var(--amber)' : 'var(--green)' }}>{formatAmount(summary.net)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Summary — desktop: 3 accent cards */}
+      {loading && !summary ? (
+        <div className="hidden sm:grid sm:grid-cols-3 gap-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: 'var(--border)' }} />
+          ))}
+        </div>
+      ) : summary && (
+        <div className="hidden sm:grid sm:grid-cols-3 gap-3">
+          <StatCard label="Income" value={summary.total_income} sub={`${summary.transaction_count} transactions`} accent="green" />
+          <StatCard label="Expenses" value={summary.total_expense} sub="" accent="default" />
+          <StatCard
+            label="Net balance"
+            value={summary.net}
+            sub={isDeficit ? 'Deficit this period' : 'Surplus this period'}
+            accent={isDeficit ? 'amber' : 'green'}
+          />
+        </div>
+      )}
+
+      {/* Charts — row 1: category (2/3) + mode (1/3) */}
+      <div className="grid md:grid-cols-3 gap-5">
+        <ChartCard title="Spend by category" className="md:col-span-2">
+          {categoryData.length === 0 ? <EmptyChart /> : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={categoryData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={fmtAxis} />
+                <YAxis
+                  dataKey="category"
+                  type="category"
+                  tick={{ fontSize: 10, fill: 'var(--text3)' }}
+                  width={95}
+                  interval={0}
+                />
+                <Tooltip
+                  cursor={false}
+                  formatter={(v: number) => formatAmount(v)}
+                  contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
+                />
+                <Bar dataKey="total" radius={[0, 3, 3, 0]} isAnimationActive={false}>
+                  {categoryData.map(entry => (
+                    <Cell key={entry.category} fill={getCategoryColor(entry.category)} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        <ChartCard title="By payment mode">
+          {byMode.length === 0 ? <EmptyChart /> : (
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie
+                  data={byMode.map(m => ({ ...m, total: parseFloat(m.total) }))}
+                  dataKey="total"
+                  nameKey="mode"
+                  cx="50%"
+                  cy="45%"
+                  innerRadius={40}
+                  outerRadius={65}
+                  isAnimationActive={false}
+                >
+                  {byMode.map((entry) => (
+                    <Cell key={entry.mode} fill={getCategoryColor(entry.mode)} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(v: number) => formatAmount(v)}
+                  contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
+                />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10, color: 'var(--text3)' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Charts — row 2: trend (1/3) + heatmap (2/3) */}
+      <div className="grid md:grid-cols-3 gap-5">
+        <ChartCard title={range === 'month' ? 'Daily spending' : 'Monthly trend'}>
+          {range === 'month' ? (
+            dailyBarData.length === 0 ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={dailyBarData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--text3)' }} interval={1} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={fmtAxis} width={40} />
+                  <Tooltip
+                    cursor={false}
+                    formatter={(v: number) => formatAmount(v)}
+                    contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
+                  />
+                  <Bar dataKey="total" fill="var(--amber)" name="Spend" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          ) : (
+            trendData.length === 0 ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text3)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={fmtAxis} width={40} />
+                  <Tooltip
+                    cursor={false}
+                    formatter={(v: number) => formatAmount(v)}
+                    contentStyle={{ fontSize: 11, background: 'var(--surface)', borderColor: 'var(--border)' }}
+                  />
+                  <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="income" fill="var(--green)" name="Income" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="expense" fill="var(--amber)" name="Expense" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          )}
+        </ChartCard>
+
+        <ChartCard title="Daily spend pattern" className="md:col-span-2">
+          <SpendHeatmap
+            data={dailySpend}
+            dateFrom={rangeDates.date_from}
+            dateTo={rangeDates.date_to}
+          />
+        </ChartCard>
+      </div>
+
+      </div>{/* end fade wrapper */}
     </div>
   )
 }
 
-export default function DashboardPage() {
-  const { summary, byCategory, trend, byMode, loading } = useAnalytics()
-  const { filters, setFilter } = useFilterStore()
+// ── Heatmap ───────────────────────────────────────────────────────────────────
 
-  const month = filters.date_from?.slice(0, 7) || currentMonth()
+function SpendHeatmap({
+  data,
+  dateFrom,
+  dateTo,
+}: {
+  data: DailySpendItem[]
+  dateFrom?: string
+  dateTo?: string
+}) {
+  if (!data.length) return <EmptyChart />
+
+  const dateMap = new Map(data.map(d => [d.date, parseFloat(d.total)]))
+  const max = Math.max(...[...dateMap.values()], 1)
+
+  // Use filter range boundaries, falling back to data bounds for "all time"
+  const rangeStart = dateFrom ? dayjs(dateFrom) : dayjs(data[0].date)
+  const rangeEnd = dateTo ? dayjs(dateTo) : dayjs(data[data.length - 1].date)
+
+  const cellColor = (amount: number) => {
+    if (amount === 0) return 'color-mix(in srgb, var(--border) 80%, var(--bg))'
+    const t = amount / max
+    if (t < 0.25) return 'color-mix(in srgb, var(--green) 20%, var(--bg))'
+    if (t < 0.5)  return 'color-mix(in srgb, var(--green) 45%, var(--bg))'
+    if (t < 0.75) return 'color-mix(in srgb, var(--green) 70%, var(--bg))'
+    return 'var(--green)'
+  }
+
+  const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+  // Build month groups independently — each month only contains its own dates.
+  // Weeks that span two months get a partial column in each month (null for days
+  // outside that month), giving irregular grids at month boundaries.
+  const monthGroups: { month: string; weeks: (string | null)[][] }[] = []
+
+  let curMonth = rangeStart.startOf('month')
+  while (!curMonth.isAfter(rangeEnd)) {
+    const monthStart = curMonth.isBefore(rangeStart) ? rangeStart : curMonth
+    const monthEnd = curMonth.endOf('month').isAfter(rangeEnd) ? rangeEnd : curMonth.endOf('month')
+
+    // Collect this month's dates into week-indexed slots
+    const weekMap = new Map<string, (string | null)[]>()
+    let d = monthStart
+    while (!d.isAfter(monthEnd)) {
+      const sunday = d.startOf('week').format('YYYY-MM-DD')
+      if (!weekMap.has(sunday)) weekMap.set(sunday, Array(7).fill(null))
+      weekMap.get(sunday)![d.day()] = d.format('YYYY-MM-DD')
+      d = d.add(1, 'day')
+    }
+
+    const weeks = [...weekMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, w]) => w)
+
+    if (weeks.length > 0) {
+      monthGroups.push({ month: curMonth.format('MMM'), weeks })
+    }
+    curMonth = curMonth.add(1, 'month')
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">Dashboard</h2>
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => {
-            const m = e.target.value
-            setFilter('date_from', m ? `${m}-01` : undefined)
-            setFilter('date_to', m ? `${m}-31` : undefined)
-          }}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+    <div className="flex gap-6 overflow-x-auto pb-1">
+      {/* Day-of-week labels */}
+      <div className="flex flex-col gap-[4px] pt-6 shrink-0">
+        {DAY_LABELS.map((d, i) => (
+          <div key={i} className="h-[16px] text-[9px] leading-none w-3 text-right" style={{ color: 'var(--text4)' }}>{d}</div>
+        ))}
       </div>
-
-      {/* Summary cards */}
-      {loading && !summary ? (
-        <div className="grid grid-cols-3 gap-3">
-          {[1,2,3].map(i => <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />)}
+      {/* Month sections */}
+      {monthGroups.map((group, gi) => (
+        <div key={gi} className="shrink-0">
+          <div className="text-[9px] font-medium h-5 flex items-end justify-center mb-1" style={{ color: 'var(--text3)' }}>
+            {group.month}
+          </div>
+          <div className="flex gap-[4px]">
+            {group.weeks.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-[4px] shrink-0">
+                {week.map((date, di) =>
+                  date === null ? (
+                    <div key={di} className="w-[16px] h-[16px] rounded-[3px]" style={{ background: 'transparent' }} />
+                  ) : (
+                    <div
+                      key={date}
+                      title={`${dayjs(date).format('DD MMM')}: ${(dateMap.get(date) ?? 0) > 0 ? formatAmount(dateMap.get(date) ?? 0) : 'No spend'}`}
+                      className="w-[16px] h-[16px] rounded-[3px] cursor-default"
+                      style={{ background: cellColor(dateMap.get(date) ?? 0) }}
+                    />
+                  )
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      ) : summary && (
-        <div className="grid grid-cols-3 gap-3">
-          <SummaryCard label="Income" value={summary.total_income} color="text-green-600" />
-          <SummaryCard label="Expense" value={summary.total_expense} color="text-red-600" />
-          <SummaryCard label="Net" value={summary.net} color={parseFloat(summary.net) >= 0 ? 'text-blue-600' : 'text-red-600'} />
-        </div>
-      )}
-
-      {/* Charts */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Spend by category */}
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Spend by Category</h3>
-          {byCategory.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={byCategory} dataKey="total" nameKey="category" cx="50%" cy="50%" outerRadius={80} animationDuration={300}>
-                  {byCategory.map((entry) => (
-                    <Cell key={entry.category} fill={CATEGORY_COLORS[entry.category] || '#9ca3af'} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v: number) => formatAmount(v)} />
-                <Legend iconType="circle" iconSize={8} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Monthly trend */}
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Monthly Trend</h3>
-          {trend.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => formatAmount(v)} />
-                <Legend />
-                <Bar dataKey="income" fill="#22c55e" name="Income" radius={[3,3,0,0]} animationDuration={300} />
-                <Bar dataKey="expense" fill="#ef4444" name="Expense" radius={[3,3,0,0]} animationDuration={300} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Spend by mode */}
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Spend by Payment Mode</h3>
-          {byMode.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={byMode} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-                <YAxis dataKey="mode" type="category" tick={{ fontSize: 11 }} width={90} />
-                <Tooltip formatter={(v: number) => formatAmount(v)} />
-                <Bar dataKey="total" fill="#6366f1" name="Amount" radius={[0,3,3,0]} animationDuration={300} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
+      ))}
     </div>
   )
+}
+
+// ── Shared components ─────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent: 'green' | 'amber' | 'default' }) {
+  const borderColor = accent === 'green' ? 'var(--green)' : accent === 'amber' ? 'var(--amber)' : 'transparent'
+  const textColor = accent === 'green' ? 'var(--green)' : accent === 'amber' ? 'var(--amber)' : 'var(--text)'
+  return (
+    <div
+      className="rounded-xl p-3 sm:p-4 border-l-4"
+      style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderLeft: `4px solid ${borderColor}` }}
+    >
+      <p className="text-[10px] uppercase tracking-[0.5px] font-medium mb-1.5" style={{ color: 'var(--text3)' }}>{label}</p>
+      <p className="text-[17px] sm:text-[22px] font-medium" style={{ color: textColor }}>{formatAmount(value)}</p>
+      {sub && <p className="text-[11px] mt-1" style={{ color: 'var(--text4)' }}>{sub}</p>}
+    </div>
+  )
+}
+
+function ChartCard({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-xl p-4 border ${className}`} style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+      <p className="text-[11px] uppercase tracking-[0.5px] font-medium mb-3.5" style={{ color: 'var(--text3)' }}>{title}</p>
+      {children}
+    </div>
+  )
+}
+
+function EmptyChart() {
+  return <p className="text-[12px] text-center py-8" style={{ color: 'var(--text4)' }}>No data</p>
 }

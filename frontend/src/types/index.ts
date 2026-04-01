@@ -10,6 +10,7 @@ export interface Bank {
   name: string
   short_code: string | null
   is_active: boolean
+  is_archived: boolean
   created_at: string
 }
 
@@ -70,18 +71,35 @@ export interface ImportJob {
   filename: string
   bank_hint: string | null
   llm_provider: string | null
-  status: 'processing' | 'completed' | 'failed'
+  status: 'processing' | 'extracting' | 'mapping' | 'completed' | 'failed'
   total_rows: number | null
   parsed_rows: number | null
   error_message: string | null
   created_at: string
   completed_at: string | null
+  fully_extracted: number
+  pending_verification: number
+}
+
+export interface CategoryItem {
+  id: string
+  name: string
+  created_at: string
+}
+
+export interface ModeItem {
+  id: string
+  name: string
+  created_at: string
 }
 
 export interface Budget {
   id: string
   category: string
-  month: string
+  month: string | null
+  start_date: string | null
+  end_date: string | null
+  cycle_days: number | null
   amount: string
   created_at: string
   updated_at: string
@@ -92,6 +110,13 @@ export interface BudgetProgress {
   budget_amount: string
   spent_amount: string
   percentage: number
+  current_cycle_start: string
+  current_cycle_end: string
+}
+
+export interface DailySpendItem {
+  date: string
+  total: string
 }
 
 export interface Summary {
@@ -141,4 +166,6 @@ export interface Filters {
   bank_id?: string
   mode?: string
   type?: string
+  description?: string
+  import_job_id?: string
 }

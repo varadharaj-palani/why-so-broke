@@ -63,8 +63,7 @@ async def verify_transaction(
         )
         db.add(main_tx)
 
-    unverified.status = "verified"
-    unverified.verified_at = datetime.now(timezone.utc)
+    await db.delete(unverified)
     await db.flush()
 
     await activity_service.log(
@@ -81,8 +80,7 @@ async def verify_transaction(
 async def reject_transaction(
     db: AsyncSession, unverified: UnverifiedTransaction
 ) -> None:
-    unverified.status = "rejected"
-    unverified.verified_at = datetime.now(timezone.utc)
+    await db.delete(unverified)
     await db.flush()
     await activity_service.log(
         db,

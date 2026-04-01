@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, meta, banks, transactions, unverified, imports, analytics, budgets, activity, export
+from app.routers import auth, meta, banks, transactions, unverified, imports, analytics, budgets, activity, export, categories, modes
 from app.config import settings
 
 app = FastAPI(title="Why So Broke", version="1.0.0")
@@ -31,3 +31,5 @@ app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(budgets.router, prefix="/api/v1")
 app.include_router(activity.router, prefix="/api/v1")
 app.include_router(export.router, prefix="/api/v1")
+app.include_router(categories.router, prefix="/api/v1")
+app.include_router(modes.router, prefix="/api/v1")
