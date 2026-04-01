@@ -172,7 +172,7 @@ export default function DashboardPage() {
       )}
 
       {/* All data sections fade together on filter change */}
-      <div style={{ opacity: isTransitioning ? 0.45 : 1, transition: 'opacity 0.25s ease' }}>
+      <div className="space-y-5" style={{ opacity: isTransitioning ? 0.45 : 1, transition: 'opacity 0.25s ease' }}>
 
       {/* Summary — mobile: compact single card with 3 rows */}
       {loading && !summary ? (
