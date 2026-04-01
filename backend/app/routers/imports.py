@@ -106,7 +106,7 @@ async def list_imports(
     # Compute pending_verification counts in one query
     uv_counts_result = await db.execute(
         select(UnverifiedTransaction.import_job_id, func.count().label("cnt"))
-        .where(UnverifiedTransaction.import_job_id.in_(job_ids))
+        .where(UnverifiedTransaction.import_job_id.in_(job_ids), UnverifiedTransaction.status == "pending")
         .group_by(UnverifiedTransaction.import_job_id)
     )
     uv_counts = {row.import_job_id: row.cnt for row in uv_counts_result}
@@ -134,7 +134,7 @@ async def get_import(
         select(func.count()).select_from(Transaction).where(Transaction.import_job_id == job_id)
     )
     uv_count_result = await db.execute(
-        select(func.count()).select_from(UnverifiedTransaction).where(UnverifiedTransaction.import_job_id == job_id)
+        select(func.count()).select_from(UnverifiedTransaction).where(UnverifiedTransaction.import_job_id == job_id, UnverifiedTransaction.status == "pending")
     )
 
     return _job_to_out(job, tx_count_result.scalar_one(), uv_count_result.scalar_one())
