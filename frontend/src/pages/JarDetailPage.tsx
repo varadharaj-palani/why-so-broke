@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { jarsApi } from '../api/jars'
 import { banksApi } from '../api/banks'
@@ -14,6 +14,8 @@ import {
   ArchiveBoxIcon,
 } from '@heroicons/react/24/outline'
 import dayjs from 'dayjs'
+import Picker from '@emoji-mart/react'
+import data from '@emoji-mart/data'
 
 const TODAY = dayjs().format('YYYY-MM-DD')
 
@@ -21,8 +23,6 @@ const JAR_COLORS = [
   '#22c55e', '#3b82f6', '#f59e0b', '#ef4444',
   '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
 ]
-
-const JAR_EMOJIS = ['🏦', '💰', '🏠', '✈️', '🎓', '🏥', '🚗', '💍', '🌴', '📱', '🎮', '🍕', '💻', '🎁', '⚽', '🎵']
 
 // ── Confirm Modal ─────────────────────────────────────────────────────────────
 
@@ -173,6 +173,8 @@ function EditJarModal({
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [showPicker, setShowPicker] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
 
   const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
   const fiStyle = { background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }
@@ -234,18 +236,39 @@ function EditJarModal({
         </div>
         <div>
           <label className="block text-[12px] font-medium mb-2" style={{ color: 'var(--text2)' }}>Icon (optional)</label>
-          <div className="flex gap-1.5 flex-wrap">
+          <div className="flex items-center gap-2 relative">
             <button onClick={() => setForm({ ...form, emoji: '' })}
               className="w-8 h-8 rounded-md border text-[13px] transition-all flex items-center justify-center"
               style={{ borderColor: form.emoji === '' ? 'var(--text)' : 'var(--border2)', background: form.emoji === '' ? 'var(--border)' : 'var(--surface)', color: 'var(--text4)' }}
               title="No icon">✕</button>
-            {JAR_EMOJIS.map(em => (
-              <button key={em} onClick={() => setForm({ ...form, emoji: em })}
-                className="w-8 h-8 rounded-md border text-[18px] transition-all"
-                style={{ borderColor: form.emoji === em ? 'var(--text)' : 'var(--border2)', background: form.emoji === em ? 'var(--border)' : 'var(--surface)' }}>
-                {em}
-              </button>
-            ))}
+            <button
+              onClick={() => setShowPicker(p => !p)}
+              className="w-9 h-9 rounded-md border text-[22px] flex items-center justify-center transition-all"
+              style={{
+                borderColor: showPicker ? 'var(--green)' : 'var(--border2)',
+                background: 'var(--surface)',
+              }}
+              title="Pick emoji"
+            >
+              {form.emoji || '😀'}
+            </button>
+            {form.emoji && (
+              <span className="text-[12px]" style={{ color: 'var(--text3)' }}>{form.emoji}</span>
+            )}
+            {showPicker && (
+              <div ref={pickerRef} className="absolute top-10 left-0 z-50" style={{ overflow: 'visible' }}>
+                <Picker
+                  data={data}
+                  theme="light"
+                  set="native"
+                  onEmojiSelect={(em: { native: string }) => {
+                    setForm({ ...form, emoji: em.native })
+                    setShowPicker(false)
+                  }}
+                  onClickOutside={() => setShowPicker(false)}
+                />
+              </div>
+            )}
           </div>
         </div>
         {error && <p className="text-[12px] text-red-500">{error}</p>}
@@ -440,7 +463,7 @@ export default function JarDetailPage() {
           <div className="flex items-end justify-between mb-1">
             <div>
               <p className="text-[11px] uppercase tracking-wide mb-0.5" style={{ color: 'var(--text4)' }}>Balance</p>
-              <p className="text-[32px] font-bold leading-none" style={{ color }}>{formatAmount(jar.balance)}</p>
+              <p className="text-[32px] font-bold leading-none" style={{ color: 'var(--text)' }}>{formatAmount(jar.balance)}</p>
             </div>
             {target && (
               <div className="text-right">
@@ -524,15 +547,6 @@ export default function JarDetailPage() {
 
                     <div className="flex items-center justify-between flex-1 px-4 py-3 gap-3">
                       <div className="flex items-start gap-3 min-w-0">
-                        <span
-                          className="flex-shrink-0 mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                          style={{
-                            background: isPositive ? 'var(--gl)' : 'var(--al)',
-                            color: isPositive ? 'var(--green)' : 'var(--amber)',
-                          }}
-                        >
-                          {isPositive ? 'Added' : 'Withdrawn'}
-                        </span>
                         <div className="min-w-0">
                           <p className="text-[14px] font-semibold leading-none" style={{ color: isPositive ? 'var(--green)' : 'var(--amber)' }}>
                             {isPositive ? '+' : ''}{formatAmount(c.amount)}
@@ -570,18 +584,14 @@ export default function JarDetailPage() {
           <button
             onClick={() => setEditModal(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-md border text-[13px] transition-colors"
-            style={{ borderColor: 'var(--border2)', color: 'var(--text3)', background: 'var(--surface)' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--text3)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.borderColor = 'var(--border2)' }}
+            style={{ borderColor: 'var(--green)', color: 'var(--green)', background: 'rgba(34,197,94,0.08)' }}
           >
             <PencilIcon className="w-4 h-4" /> Edit jar
           </button>
           <button
             onClick={() => setConfirmArchive(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-md border text-[13px] transition-colors"
-            style={{ borderColor: 'var(--border2)', color: 'var(--text3)', background: 'var(--surface)' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--amber)'; e.currentTarget.style.borderColor = 'var(--amber)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.borderColor = 'var(--border2)' }}
+            style={{ borderColor: 'var(--amber)', color: 'var(--amber)', background: 'rgba(245,158,11,0.08)' }}
           >
             <ArchiveBoxIcon className="w-4 h-4" /> Archive jar
           </button>

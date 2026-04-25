@@ -1,17 +1,17 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { jarsApi } from '../api/jars'
 import { banksApi } from '../api/banks'
 import { Jar } from '../types'
 import { formatAmount } from '../utils/formatters'
 import { PlusIcon, XMarkIcon, PencilIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline'
+import Picker from '@emoji-mart/react'
+import data from '@emoji-mart/data'
 
 const JAR_COLORS = [
   '#22c55e', '#3b82f6', '#f59e0b', '#ef4444',
   '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
 ]
-
-const JAR_EMOJIS = ['🏦', '💰', '🏠', '✈️', '🎓', '🏥', '🚗', '💍', '🌴', '📱', '🎮', '🍕', '💻', '🎁', '⚽', '🎵']
 
 function JarModal({
   jar,
@@ -31,6 +31,8 @@ function JarModal({
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [showPicker, setShowPicker] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
 
   const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
   const fiStyle = { background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }
@@ -100,7 +102,7 @@ function JarModal({
 
         <div>
           <label className="block text-[12px] font-medium mb-2" style={{ color: 'var(--text2)' }}>Icon (optional)</label>
-          <div className="flex gap-1.5 flex-wrap">
+          <div className="flex items-center gap-2 relative">
             <button
               onClick={() => setForm({ ...form, emoji: '' })}
               className="w-8 h-8 rounded-md border text-[13px] transition-all flex items-center justify-center"
@@ -113,19 +115,34 @@ function JarModal({
             >
               ✕
             </button>
-            {JAR_EMOJIS.map(em => (
-              <button
-                key={em}
-                onClick={() => setForm({ ...form, emoji: em })}
-                className="w-8 h-8 rounded-md border text-[18px] transition-all"
-                style={{
-                  borderColor: form.emoji === em ? 'var(--text)' : 'var(--border2)',
-                  background: form.emoji === em ? 'var(--border)' : 'var(--surface)',
-                }}
-              >
-                {em}
-              </button>
-            ))}
+            <button
+              onClick={() => setShowPicker(p => !p)}
+              className="w-9 h-9 rounded-md border text-[22px] flex items-center justify-center transition-all"
+              style={{
+                borderColor: showPicker ? 'var(--green)' : 'var(--border2)',
+                background: 'var(--surface)',
+              }}
+              title="Pick emoji"
+            >
+              {form.emoji || '😀'}
+            </button>
+            {form.emoji && (
+              <span className="text-[12px]" style={{ color: 'var(--text3)' }}>{form.emoji}</span>
+            )}
+            {showPicker && (
+              <div ref={pickerRef} className="absolute top-10 left-0 z-50" style={{ overflow: 'visible' }}>
+                <Picker
+                  data={data}
+                  theme="light"
+                  set="native"
+                  onEmojiSelect={(em: { native: string }) => {
+                    setForm({ ...form, emoji: em.native })
+                    setShowPicker(false)
+                  }}
+                  onClickOutside={() => setShowPicker(false)}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -151,11 +168,13 @@ function JarCard({
   onEdit,
   onArchive,
   onNavigate,
+  archived,
 }: {
   jar: Jar
   onEdit: () => void
   onArchive: () => void
   onNavigate: () => void
+  archived?: boolean
 }) {
   const color = jar.color || '#22c55e'
   const balance = parseFloat(jar.balance)
@@ -167,7 +186,7 @@ function JarCard({
     <div
       onClick={onNavigate}
       className="rounded-xl border overflow-hidden transition-shadow duration-150"
-      style={{ background: 'var(--surface)', borderColor: 'var(--border)', cursor: 'pointer' }}
+      style={{ background: 'var(--surface)', borderColor: 'var(--border)', cursor: 'pointer', opacity: archived ? 0.6 : 1 }}
       onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)')}
       onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
     >
@@ -177,11 +196,16 @@ function JarCard({
           <span className="text-2xl leading-none">{emoji}</span>
           <h4 className="text-[15px] font-semibold" style={{ color: 'white' }}>{jar.name}</h4>
         </div>
+        {archived && (
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.25)', color: 'white' }}>
+            Archived
+          </span>
+        )}
       </div>
 
       {/* Body */}
       <div className="px-4 pt-3 pb-3">
-        <p className="text-[22px] font-bold leading-none mb-1" style={{ color }}>{formatAmount(jar.balance)}</p>
+        <p className="text-[22px] font-bold leading-none mb-1" style={{ color: 'var(--text)' }}>{formatAmount(jar.balance)}</p>
         {target && (
           <p className="text-[11px] mb-2.5" style={{ color: 'var(--text3)' }}>
             of {formatAmount(jar.target_amount!)} · {pct.toFixed(0)}%
@@ -198,26 +222,32 @@ function JarCard({
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-1 px-3 pb-3 border-t pt-2" style={{ borderColor: 'var(--border)' }}>
-        <button
-          onClick={e => { e.stopPropagation(); onEdit() }}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[12px] border transition-colors"
-          style={{ borderColor: 'var(--border2)', color: 'var(--text3)', background: 'var(--surface)' }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--text3)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.borderColor = 'var(--border2)' }}
-        >
-          <PencilIcon className="w-3 h-3" /> Edit
-        </button>
-        <button
-          onClick={e => { e.stopPropagation(); onArchive() }}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[12px] border transition-colors"
-          style={{ borderColor: 'var(--border2)', color: 'var(--text3)', background: 'var(--surface)' }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--amber)'; e.currentTarget.style.borderColor = 'var(--amber)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.borderColor = 'var(--border2)' }}
-        >
-          <ArchiveBoxIcon className="w-3 h-3" /> Archive
-        </button>
-      </div>
+      {!archived && (
+        <div className="flex items-center gap-1 px-3 pb-3 border-t pt-2" style={{ borderColor: 'var(--border)' }}>
+          <button
+            onClick={e => { e.stopPropagation(); onEdit() }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[12px] border transition-colors"
+            style={{
+              borderColor: 'var(--green)',
+              color: 'var(--green)',
+              background: 'rgba(34,197,94,0.08)',
+            }}
+          >
+            <PencilIcon className="w-3 h-3" /> Edit
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); onArchive() }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[12px] border transition-colors"
+            style={{
+              borderColor: 'var(--amber)',
+              color: 'var(--amber)',
+              background: 'rgba(245,158,11,0.08)',
+            }}
+          >
+            <ArchiveBoxIcon className="w-3 h-3" /> Archive
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -225,7 +255,9 @@ function JarCard({
 export default function JarsPage() {
   const navigate = useNavigate()
   const [jars, setJars] = useState<Jar[]>([])
+  const [archivedJars, setArchivedJars] = useState<Jar[]>([])
   const [loading, setLoading] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const [modalJar, setModalJar] = useState<Jar | 'new' | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<Jar | null>(null)
 
@@ -239,10 +271,21 @@ export default function JarsPage() {
     }
   }, [])
 
+  const fetchArchivedJars = useCallback(async () => {
+    const r = await jarsApi.list(true)
+    setArchivedJars(r.data.filter((j: Jar) => j.is_archived))
+  }, [])
+
   useEffect(() => {
     fetchJars()
     banksApi.list().catch(() => {})
   }, [fetchJars])
+
+  useEffect(() => {
+    if (showArchived) {
+      fetchArchivedJars()
+    }
+  }, [showArchived, fetchArchivedJars])
 
   async function handleSave(data: { name: string; description?: string; target_amount?: string; color?: string; emoji?: string }) {
     if (modalJar && modalJar !== 'new') {
@@ -258,6 +301,7 @@ export default function JarsPage() {
     await jarsApi.archive(jar.id)
     setConfirmArchive(null)
     fetchJars()
+    if (showArchived) fetchArchivedJars()
   }
 
   const totalSaved = jars.reduce((sum, j) => sum + parseFloat(j.balance), 0)
@@ -272,11 +316,24 @@ export default function JarsPage() {
             {jars.length > 0 && ` · ${formatAmount(String(totalSaved))} total saved`}
           </p>
         </div>
-        <button onClick={() => setModalJar('new')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] text-white flex-shrink-0"
-          style={{ background: 'var(--green)' }}>
-          <PlusIcon className="w-4 h-4" /> New jar
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setShowArchived(s => !s)}
+            className="px-3 py-1.5 rounded-md text-[13px] border transition-colors"
+            style={{
+              borderColor: showArchived ? 'var(--text3)' : 'var(--border2)',
+              color: showArchived ? 'var(--text)' : 'var(--text3)',
+              background: showArchived ? 'var(--border)' : 'var(--surface)',
+            }}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
+          <button onClick={() => setModalJar('new')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] text-white"
+            style={{ background: 'var(--green)' }}>
+            <PlusIcon className="w-4 h-4" /> New jar
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -303,6 +360,28 @@ export default function JarsPage() {
             />
           ))}
         </div>
+      )}
+
+      {showArchived && archivedJars.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[12px] font-medium uppercase tracking-wide" style={{ color: 'var(--text4)' }}>Archived</p>
+          <div className="grid md:grid-cols-2 gap-3">
+            {archivedJars.map(jar => (
+              <JarCard
+                key={jar.id}
+                jar={jar}
+                archived
+                onEdit={() => {}}
+                onArchive={() => {}}
+                onNavigate={() => navigate(`/jars/${jar.id}`, { state: { jars: archivedJars } })}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showArchived && archivedJars.length === 0 && (
+        <p className="text-[13px] text-center py-4" style={{ color: 'var(--text4)' }}>No archived jars.</p>
       )}
 
       {modalJar !== null && (

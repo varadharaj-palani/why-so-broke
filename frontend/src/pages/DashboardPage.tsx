@@ -488,47 +488,102 @@ function amountColor(value: string) {
 }
 
 function BankBalanceCard({ balance: b }: { balance: BankBalance }) {
+  const [open, setOpen] = useState(false)
   const available = parseFloat(b.available)
   const jarLocked = parseFloat(b.jar_locked)
   const accentColor = available >= 0 ? 'var(--green)' : 'var(--amber)'
 
   return (
-    <div
-      className="shrink-0 rounded-xl p-4 flex flex-col gap-3"
-      style={{
-        minWidth: '160px',
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderLeft: `4px solid ${accentColor}`,
-      }}
-    >
-      {/* Bank name + short code */}
-      <div>
-        <p className="text-[13px] font-medium leading-tight" style={{ color: 'var(--text)' }}>{b.bank_name}</p>
-        {b.short_code && (
-          <p className="text-[10px] mt-0.5" style={{ color: 'var(--text4)' }}>{b.short_code}</p>
-        )}
-      </div>
+    <>
+      {/* Card */}
+      <div
+        className="shrink-0 rounded-xl p-4 flex flex-col gap-3 cursor-pointer"
+        onClick={() => setOpen(true)}
+        style={{
+          minWidth: '160px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderLeft: `4px solid ${accentColor}`,
+          transition: 'opacity 0.15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+      >
+        {/* Bank name + short code */}
+        <div>
+          <p className="text-[13px] font-medium leading-tight" style={{ color: 'var(--text)' }}>{b.bank_name}</p>
+          {b.short_code && (
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text4)' }}>{b.short_code}</p>
+          )}
+        </div>
 
-      {/* Available — hero number */}
-      <div>
-        <p className="text-[22px] font-bold leading-none" style={{ color: accentColor }}>{formatAmount(b.available)}</p>
-        <p className="text-[10px] mt-1" style={{ color: 'var(--text3)' }}>Available</p>
-      </div>
-
-      {/* Secondary info */}
-      <div className="flex flex-col gap-1.5">
-        {jarLocked > 0 && (
-          <p className="text-[11px]" style={{ color: 'var(--amber)' }}>
-            −{formatAmount(b.jar_locked)} 🔒 In jars
-          </p>
-        )}
-        <div className="border-t pt-1.5" style={{ borderColor: 'var(--border)' }}>
-          <p className="text-[11px]" style={{ color: 'var(--text4)' }}>
-            Total &nbsp; {formatAmount(b.total_balance)}
-          </p>
+        {/* Available — hero number */}
+        <div>
+          <p className="text-[22px] font-bold leading-none" style={{ color: accentColor }}>{formatAmount(b.available)}</p>
+          <p className="text-[10px] mt-1" style={{ color: 'var(--text3)' }}>Available</p>
         </div>
       </div>
-    </div>
+
+      {/* Modal */}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="rounded-xl p-6 flex flex-col gap-4"
+            style={{
+              minWidth: '260px',
+              background: 'var(--surface)',
+              border: `1px solid var(--border)`,
+              borderTop: `4px solid ${accentColor}`,
+              position: 'relative',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setOpen(false)}
+              className="absolute top-3 right-3 text-[16px] leading-none"
+              style={{ color: 'var(--text4)', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              ✕
+            </button>
+
+            {/* Title */}
+            <div>
+              <p className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>{b.bank_name}</p>
+              {b.short_code && (
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text4)' }}>{b.short_code}</p>
+              )}
+            </div>
+
+            {/* Rows */}
+            <div className="flex flex-col gap-2">
+              {/* Total */}
+              <div className="flex justify-between items-center">
+                <span className="text-[13px]" style={{ color: 'var(--text3)' }}>Total</span>
+                <span className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{formatAmount(b.total_balance)}</span>
+              </div>
+
+              {/* In Jars — only if jar_locked > 0 */}
+              {jarLocked > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-[13px]" style={{ color: 'var(--text3)' }}>In Jars</span>
+                  <span className="text-[13px] font-medium" style={{ color: 'var(--amber)' }}>−{formatAmount(b.jar_locked)}</span>
+                </div>
+              )}
+
+              {/* Available */}
+              <div className="flex justify-between items-center border-t pt-2" style={{ borderColor: 'var(--border)' }}>
+                <span className="text-[13px] font-semibold" style={{ color: 'var(--text)' }}>Available</span>
+                <span className="text-[15px] font-bold" style={{ color: accentColor }}>{formatAmount(b.available)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
