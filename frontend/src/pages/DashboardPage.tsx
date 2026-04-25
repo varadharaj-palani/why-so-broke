@@ -232,9 +232,9 @@ export default function DashboardPage() {
         return activeBanks.length > 0 ? (
           <div>
             <p className="text-[11px] uppercase tracking-[0.5px] font-medium mb-2.5" style={{ color: 'var(--text3)' }}>Accounts</p>
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {activeBanks.map(b => (
-                <BankBalanceCard key={b.bank_id} balance={b} />
+            <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+              {activeBanks.map((b, i) => (
+                <BankBalanceRow key={b.bank_id} balance={b} isLast={i === activeBanks.length - 1} />
               ))}
             </div>
           </div>
@@ -487,32 +487,61 @@ function amountColor(value: string) {
   return parseFloat(value) < 0 ? 'var(--amber)' : 'var(--green)'
 }
 
-function BankBalanceCard({ balance: b }: { balance: BankBalance }) {
+function BankBalanceRow({ balance: b, isLast }: { balance: BankBalance; isLast: boolean }) {
+  const total = parseFloat(b.total_balance)
+  const available = parseFloat(b.available)
   const jarLocked = parseFloat(b.jar_locked)
+  const isNegative = total < 0
+
+  // Bar proportions: clamp to [0,1], available + locked should sum to 1 for positive totals
+  let availablePct = 0
+  let lockedPct = 0
+  if (!isNegative && total > 0) {
+    availablePct = Math.min(1, Math.max(0, available / total))
+    lockedPct = jarLocked > 0 ? Math.min(1 - availablePct, jarLocked / total) : 0
+  }
+
   return (
     <div
-      className="flex-shrink-0 rounded-xl border p-3.5 min-w-[150px]"
-      style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+      className="flex items-center gap-4 px-4 py-3"
+      style={!isLast ? { borderBottom: '0.5px solid var(--border)' } : undefined}
     >
-      <div className="mb-2.5">
-        <p className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{b.bank_name}</p>
-        {b.short_code && <p className="text-[10px]" style={{ color: 'var(--text4)' }}>{b.short_code}</p>}
-      </div>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-[10px] uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>Total</p>
-          <p className="text-[12px] font-medium" style={{ color: amountColor(b.total_balance) }}>{formatAmount(b.total_balance)}</p>
-        </div>
-        {jarLocked > 0 && (
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-[10px] uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>In jars</p>
-            <p className="text-[12px]" style={{ color: 'var(--amber)' }}>−{formatAmount(b.jar_locked)}</p>
-          </div>
+      {/* Left: bank name + short code */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-medium truncate" style={{ color: 'var(--text)' }}>{b.bank_name}</p>
+        {b.short_code && (
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--text4)' }}>{b.short_code}</p>
         )}
-        <div className="flex items-center justify-between gap-4 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
-          <p className="text-[10px] uppercase tracking-[0.4px] font-medium" style={{ color: 'var(--text2)' }}>Available</p>
-          <p className="text-[13px] font-semibold" style={{ color: amountColor(b.available) }}>{formatAmount(b.available)}</p>
+      </div>
+
+      {/* Middle: stacked bar */}
+      <div className="shrink-0 w-[120px]">
+        <div className="h-[6px] rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+          {isNegative ? (
+            <div className="h-full w-full rounded-full" style={{ background: 'var(--amber)' }} />
+          ) : (
+            <div className="h-full flex rounded-full overflow-hidden">
+              {availablePct > 0 && (
+                <div
+                  className="h-full"
+                  style={{ width: `${availablePct * 100}%`, background: 'var(--green)' }}
+                />
+              )}
+              {lockedPct > 0 && (
+                <div
+                  className="h-full"
+                  style={{ width: `${lockedPct * 100}%`, background: 'var(--amber)' }}
+                />
+              )}
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Right: available (large) + total (small muted) */}
+      <div className="shrink-0 text-right">
+        <p className="text-[13px] font-semibold" style={{ color: amountColor(b.available) }}>{formatAmount(b.available)}</p>
+        <p className="text-[10px] mt-0.5" style={{ color: 'var(--text4)' }}>{formatAmount(b.total_balance)}</p>
       </div>
     </div>
   )
