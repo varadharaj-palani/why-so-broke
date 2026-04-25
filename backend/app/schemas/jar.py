@@ -10,6 +10,7 @@ class JarCreate(BaseModel):
     description: Optional[str] = None
     target_amount: Optional[Decimal] = None
     color: Optional[str] = None
+    emoji: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -32,6 +33,7 @@ class JarUpdate(BaseModel):
     description: Optional[str] = None
     target_amount: Optional[Decimal] = None
     color: Optional[str] = None
+    emoji: Optional[str] = None
 
     @field_validator("target_amount")
     @classmethod
@@ -53,6 +55,7 @@ class JarOut(BaseModel):
     description: Optional[str]
     target_amount: Optional[Decimal]
     color: Optional[str]
+    emoji: Optional[str]
     is_archived: bool
     balance: Decimal
     bank_breakdown: list[BankBreakdown]

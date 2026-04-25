@@ -39,6 +39,7 @@ async def _build_jar_out(jar: Jar, db: AsyncSession) -> JarOut:
         description=jar.description,
         target_amount=jar.target_amount,
         color=jar.color,
+        emoji=jar.emoji,
         is_archived=jar.is_archived,
         balance=balance,
         bank_breakdown=breakdown,
@@ -74,6 +75,7 @@ async def create_jar(
         description=body.description,
         target_amount=body.target_amount,
         color=body.color,
+        emoji=body.emoji,
     )
     db.add(jar)
     await db.commit()

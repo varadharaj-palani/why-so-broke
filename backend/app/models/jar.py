@@ -17,6 +17,7 @@ class Jar(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     target_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    emoji: Mapped[str | None] = mapped_column(String(10), nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
