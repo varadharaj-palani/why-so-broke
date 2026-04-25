@@ -22,3 +22,4 @@ class User(Base):
     import_jobs: Mapped[list["ImportJob"]] = relationship("ImportJob", back_populates="user", cascade="all, delete-orphan")
     categories: Mapped[list["Category"]] = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     modes: Mapped[list["Mode"]] = relationship("Mode", back_populates="user", cascade="all, delete-orphan")
+    jars: Mapped[list["Jar"]] = relationship("Jar", back_populates="user", cascade="all, delete-orphan")

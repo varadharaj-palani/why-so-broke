@@ -7,9 +7,10 @@ from app.models.budget import Budget
 from app.models.activity_log import ActivityLog
 from app.models.category import Category
 from app.models.mode import Mode
+from app.models.jar import Jar, JarContribution
 
 __all__ = [
     "User", "Bank", "ImportJob", "Transaction",
     "UnverifiedTransaction", "Budget", "ActivityLog",
-    "Category", "Mode",
+    "Category", "Mode", "Jar", "JarContribution",
 ]
