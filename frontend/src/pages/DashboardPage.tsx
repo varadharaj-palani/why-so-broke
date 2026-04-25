@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useAnalytics } from '../hooks/useAnalytics'
 import { useFilterStore } from '../store/filterStore'
 import { analyticsApi } from '../api/analytics'
+import { banksApi } from '../api/banks'
 import { formatAmount } from '../utils/formatters'
 import { getCategoryColor } from '../utils/constants'
-import { DailySpendItem } from '../types'
+import { DailySpendItem, BankBalance } from '../types'
 import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import dayjs from 'dayjs'
 import {
@@ -54,6 +55,11 @@ export default function DashboardPage() {
   const [stale, setStale] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [customDates, setCustomDates] = useState<{ date_from?: string; date_to?: string }>({})
+  const [bankBalances, setBankBalances] = useState<BankBalance[]>([])
+
+  useEffect(() => {
+    banksApi.balances().then(r => setBankBalances(r.data)).catch(() => {})
+  }, [])
 
   const rangeDates = customDates.date_from || customDates.date_to ? customDates : getRangeDates(range)
 
@@ -217,6 +223,18 @@ export default function DashboardPage() {
             sub={isDeficit ? 'Deficit this period' : 'Surplus this period'}
             accent={isDeficit ? 'amber' : 'green'}
           />
+        </div>
+      )}
+
+      {/* Bank accounts — available balance per bank */}
+      {bankBalances.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.5px] font-medium mb-2.5" style={{ color: 'var(--text3)' }}>Accounts</p>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {bankBalances.map(b => (
+              <BankBalanceCard key={b.bank_id} balance={b} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -460,4 +478,35 @@ function ChartCard({ title, children, className = '' }: { title: string; childre
 
 function EmptyChart() {
   return <p className="text-[12px] text-center py-8" style={{ color: 'var(--text4)' }}>No data</p>
+}
+
+function BankBalanceCard({ balance: b }: { balance: BankBalance }) {
+  const jarLocked = parseFloat(b.jar_locked)
+  return (
+    <div
+      className="flex-shrink-0 rounded-xl border p-3.5 min-w-[150px]"
+      style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+    >
+      <div className="mb-2.5">
+        <p className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{b.bank_name}</p>
+        {b.short_code && <p className="text-[10px]" style={{ color: 'var(--text4)' }}>{b.short_code}</p>}
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-[10px] uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>Total</p>
+          <p className="text-[12px] font-medium" style={{ color: 'var(--text)' }}>{formatAmount(b.total_balance)}</p>
+        </div>
+        {jarLocked > 0 && (
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-[10px] uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>In jars</p>
+            <p className="text-[12px]" style={{ color: 'var(--amber)' }}>−{formatAmount(b.jar_locked)}</p>
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-4 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
+          <p className="text-[10px] uppercase tracking-[0.4px] font-medium" style={{ color: 'var(--text2)' }}>Available</p>
+          <p className="text-[13px] font-semibold" style={{ color: 'var(--green)' }}>{formatAmount(b.available)}</p>
+        </div>
+      </div>
+    </div>
+  )
 }
