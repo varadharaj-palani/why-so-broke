@@ -227,16 +227,19 @@ export default function DashboardPage() {
       )}
 
       {/* Bank accounts — available balance per bank */}
-      {bankBalances.length > 0 && (
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.5px] font-medium mb-2.5" style={{ color: 'var(--text3)' }}>Accounts</p>
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {bankBalances.map(b => (
-              <BankBalanceCard key={b.bank_id} balance={b} />
-            ))}
+      {(() => {
+        const activeBanks = bankBalances.filter(b => parseFloat(b.total_balance) !== 0 || parseFloat(b.available) !== 0)
+        return activeBanks.length > 0 ? (
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.5px] font-medium mb-2.5" style={{ color: 'var(--text3)' }}>Accounts</p>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {activeBanks.map(b => (
+                <BankBalanceCard key={b.bank_id} balance={b} />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        ) : null
+      })()}
 
       {/* Charts — row 1: category (2/3) + mode (1/3) */}
       <div className="grid md:grid-cols-3 gap-5">
@@ -480,6 +483,10 @@ function EmptyChart() {
   return <p className="text-[12px] text-center py-8" style={{ color: 'var(--text4)' }}>No data</p>
 }
 
+function amountColor(value: string) {
+  return parseFloat(value) < 0 ? 'var(--amber)' : 'var(--green)'
+}
+
 function BankBalanceCard({ balance: b }: { balance: BankBalance }) {
   const jarLocked = parseFloat(b.jar_locked)
   return (
@@ -494,7 +501,7 @@ function BankBalanceCard({ balance: b }: { balance: BankBalance }) {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-4">
           <p className="text-[10px] uppercase tracking-[0.4px]" style={{ color: 'var(--text3)' }}>Total</p>
-          <p className="text-[12px] font-medium" style={{ color: 'var(--text)' }}>{formatAmount(b.total_balance)}</p>
+          <p className="text-[12px] font-medium" style={{ color: amountColor(b.total_balance) }}>{formatAmount(b.total_balance)}</p>
         </div>
         {jarLocked > 0 && (
           <div className="flex items-center justify-between gap-4">
@@ -504,7 +511,7 @@ function BankBalanceCard({ balance: b }: { balance: BankBalance }) {
         )}
         <div className="flex items-center justify-between gap-4 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
           <p className="text-[10px] uppercase tracking-[0.4px] font-medium" style={{ color: 'var(--text2)' }}>Available</p>
-          <p className="text-[13px] font-semibold" style={{ color: 'var(--green)' }}>{formatAmount(b.available)}</p>
+          <p className="text-[13px] font-semibold" style={{ color: amountColor(b.available) }}>{formatAmount(b.available)}</p>
         </div>
       </div>
     </div>
