@@ -9,6 +9,7 @@ import UnverifiedPage from './pages/UnverifiedPage'
 import ImportPage from './pages/ImportPage'
 import BudgetsPage from './pages/BudgetsPage'
 import JarsPage from './pages/JarsPage'
+import JarDetailPage from './pages/JarDetailPage'
 import SettingsPage from './pages/SettingsPage'
 import AppShell from './components/layout/AppShell'
 import { ToastProvider } from './contexts/ToastContext'
@@ -58,6 +59,7 @@ const router = createBrowserRouter([
       { path: '/import', element: <ImportPage /> },
       { path: '/budgets', element: <BudgetsPage /> },
       { path: '/jars', element: <JarsPage /> },
+      { path: '/jars/:id', element: <JarDetailPage /> },
       { path: '/settings', element: <SettingsPage /> },
     ],
   },

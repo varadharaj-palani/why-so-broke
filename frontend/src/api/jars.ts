@@ -4,9 +4,9 @@ import { Jar, JarContribution } from '../types'
 export const jarsApi = {
   list: (include_archived = false) =>
     api.get<Jar[]>('/jars', { params: { include_archived } }),
-  create: (data: { name: string; description?: string; target_amount?: string; color?: string }) =>
+  create: (data: { name: string; description?: string; target_amount?: string; color?: string; emoji?: string }) =>
     api.post<Jar>('/jars', data),
-  update: (id: string, data: { name?: string; description?: string; target_amount?: string; color?: string }) =>
+  update: (id: string, data: { name?: string; description?: string; target_amount?: string; color?: string; emoji?: string }) =>
     api.put<Jar>(`/jars/${id}`, data),
   archive: (id: string) => api.delete(`/jars/${id}`),
 

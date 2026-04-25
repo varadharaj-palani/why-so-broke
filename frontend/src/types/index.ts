@@ -178,6 +178,7 @@ export interface Jar {
   description: string | null
   target_amount: string | null
   color: string | null
+  emoji: string | null
   is_archived: boolean
   balance: string
   bank_breakdown: BankBreakdown[]
