@@ -7,6 +7,7 @@ import {
   HomeIcon, ListBulletIcon, ExclamationCircleIcon,
   ArrowUpTrayIcon, ChartBarIcon, Cog6ToothIcon,
   SunIcon, MoonIcon, ArrowRightOnRectangleIcon,
+  ArchiveBoxIcon,
 } from '@heroicons/react/24/outline'
 
 const overviewNav = [
@@ -18,6 +19,7 @@ const overviewNav = [
 const manageNav = [
   { to: '/import', label: 'Import', icon: ArrowUpTrayIcon },
   { to: '/budgets', label: 'Budgets', icon: ChartBarIcon },
+  { to: '/jars', label: 'Jars', icon: ArchiveBoxIcon },
   { to: '/settings', label: 'Settings', icon: Cog6ToothIcon },
 ]
 

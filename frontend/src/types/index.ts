@@ -157,6 +157,46 @@ export interface Constants {
   types: string[]
 }
 
+export interface BankBalance {
+  bank_id: string
+  bank_name: string
+  short_code: string | null
+  total_balance: string
+  jar_locked: string
+  available: string
+}
+
+export interface BankBreakdown {
+  bank_id: string | null
+  bank_name: string | null
+  total: string
+}
+
+export interface Jar {
+  id: string
+  name: string
+  description: string | null
+  target_amount: string | null
+  color: string | null
+  emoji: string | null
+  is_archived: boolean
+  balance: string
+  bank_breakdown: BankBreakdown[]
+  created_at: string
+  updated_at: string
+}
+
+export interface JarContribution {
+  id: string
+  jar_id: string
+  bank_id: string | null
+  bank_name: string | null
+  amount: string
+  date: string
+  notes: string | null
+  created_at: string
+}
+
 export interface Filters {
   date_from?: string
   date_to?: string
