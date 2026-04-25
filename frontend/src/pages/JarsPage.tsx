@@ -3,7 +3,7 @@ import { jarsApi } from '../api/jars'
 import { banksApi } from '../api/banks'
 import { Jar, JarContribution, Bank } from '../types'
 import { formatAmount, formatDate } from '../utils/formatters'
-import { PlusIcon, XMarkIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline'
 import dayjs from 'dayjs'
 
 const TODAY = dayjs().format('YYYY-MM-DD')
@@ -12,8 +12,6 @@ const JAR_COLORS = [
   '#22c55e', '#3b82f6', '#f59e0b', '#ef4444',
   '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
 ]
-
-// ─── Jar Modal ─────────────────────────────────────────────────────────────────
 
 function JarModal({
   jar,
@@ -115,15 +113,15 @@ function JarModal({
   )
 }
 
-// ─── Contribution Modal ────────────────────────────────────────────────────────
-
 function ContributionModal({
   jarName,
+  type,
   banks,
   onClose,
   onSave,
 }: {
   jarName: string
+  type: 'add' | 'withdraw'
   banks: Bank[]
   onClose: () => void
   onSave: (data: { bank_id?: string; amount: string; date: string; notes?: string }) => Promise<void>
@@ -132,18 +130,23 @@ function ContributionModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
+  const isAdd = type === 'add'
+  const accentBg = isAdd ? 'var(--green)' : 'var(--amber)'
+
+  const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none transition-colors"
   const fiStyle = { background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }
 
   async function handleSave() {
-    if (!form.amount || parseFloat(form.amount) === 0) { setError('Amount cannot be zero'); return }
+    const raw = parseFloat(form.amount)
+    if (!form.amount || isNaN(raw) || raw <= 0) { setError('Enter a positive amount'); return }
     if (!form.date) { setError('Date is required'); return }
     setSaving(true)
     setError('')
     try {
+      const signed = isAdd ? String(raw) : String(-raw)
       await onSave({
         bank_id: form.bank_id || undefined,
-        amount: form.amount,
+        amount: signed,
         date: form.date,
         notes: form.notes || undefined,
       })
@@ -155,11 +158,13 @@ function ContributionModal({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.4)' }}
+    <div className="fixed inset-0 flex items-center justify-center z-[60]" style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="rounded-xl border p-6 w-[380px] max-w-[94vw] space-y-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-[16px] font-medium" style={{ color: 'var(--text)' }}>Add to {jarName}</h3>
+          <h3 className="text-[16px] font-medium" style={{ color: 'var(--text)' }}>
+            {isAdd ? `Add funds to ${jarName}` : `Withdraw from ${jarName}`}
+          </h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}>
             <XMarkIcon className="w-4 h-4" />
           </button>
@@ -167,9 +172,9 @@ function ContributionModal({
 
         <div>
           <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>Amount (₹)</label>
-          <input type="number" step="0.01" value={form.amount}
+          <input type="number" min="0.01" step="0.01" value={form.amount}
             onChange={e => setForm({ ...form, amount: e.target.value })}
-            className={fi} style={fiStyle} placeholder="Positive to add, negative to withdraw" />
+            className={fi} style={fiStyle} placeholder="e.g. 5000" />
         </div>
 
         <div>
@@ -200,9 +205,9 @@ function ContributionModal({
             style={{ borderColor: 'var(--border2)', color: 'var(--text2)', background: 'var(--surface)' }}>
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 rounded-md text-[13px] text-white disabled:opacity-50"
-            style={{ background: 'var(--green)' }}>
-            {saving ? 'Saving…' : 'Add to jar'}
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 rounded-md text-[13px] disabled:opacity-50"
+            style={{ background: accentBg, color: isAdd ? 'white' : '#1a1a1a' }}>
+            {saving ? 'Saving…' : isAdd ? 'Add funds' : 'Withdraw'}
           </button>
         </div>
       </div>
@@ -210,32 +215,31 @@ function ContributionModal({
   )
 }
 
-// ─── Jar Card ──────────────────────────────────────────────────────────────────
-
-function JarCard({
+function JarDrawer({
   jar,
   banks,
+  onClose,
   onEdit,
   onArchive,
   onContributionAdded,
 }: {
   jar: Jar
   banks: Bank[]
+  onClose: () => void
   onEdit: () => void
   onArchive: () => void
   onContributionAdded: () => void
 }) {
-  const [expanded, setExpanded] = useState(false)
   const [contributions, setContributions] = useState<JarContribution[]>([])
-  const [contribLoading, setContribLoading] = useState(false)
-  const [showAddContrib, setShowAddContrib] = useState(false)
+  const [contribLoading, setContribLoading] = useState(true)
+  const [contribModal, setContribModal] = useState<'add' | 'withdraw' | null>(null)
 
+  const color = jar.color || '#22c55e'
   const balance = parseFloat(jar.balance)
   const target = jar.target_amount ? parseFloat(jar.target_amount) : null
   const pct = target ? Math.min((balance / target) * 100, 100) : 0
-  const color = jar.color || '#22c55e'
 
-  async function loadContributions() {
+  const loadContributions = useCallback(async () => {
     setContribLoading(true)
     try {
       const r = await jarsApi.listContributions(jar.id)
@@ -243,18 +247,13 @@ function JarCard({
     } finally {
       setContribLoading(false)
     }
-  }
+  }, [jar.id])
 
-  function handleExpand() {
-    setExpanded(e => {
-      if (!e) loadContributions()
-      return !e
-    })
-  }
+  useEffect(() => { loadContributions() }, [loadContributions])
 
   async function handleAddContribution(data: { bank_id?: string; amount: string; date: string; notes?: string }) {
     await jarsApi.addContribution(jar.id, data)
-    setShowAddContrib(false)
+    setContribModal(null)
     loadContributions()
     onContributionAdded()
   }
@@ -267,124 +266,148 @@ function JarCard({
 
   return (
     <>
-      <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: expanded ? color : 'var(--border)' }}>
-        {/* Color stripe */}
-        <div className="h-1" style={{ background: color }} />
-
-        <div className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h4 className="text-[14px] font-medium" style={{ color: 'var(--text)' }}>{jar.name}</h4>
-              {jar.description && (
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>{jar.description}</p>
-              )}
-            </div>
-            <div className="text-right">
-              <p className="text-[15px] font-semibold" style={{ color }}>{formatAmount(jar.balance)}</p>
-              {target && (
-                <p className="text-[11px]" style={{ color: 'var(--text3)' }}>of {formatAmount(jar.target_amount!)}</p>
-              )}
-            </div>
-          </div>
-
-          {target && (
-            <div className="h-1.5 rounded-full mb-3" style={{ background: 'var(--border)' }}>
-              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, background: color }} />
-            </div>
-          )}
-
-          {/* Bank breakdown chips */}
-          {jar.bank_breakdown.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {jar.bank_breakdown.map((b, i) => (
-                <span key={i} className="text-[11px] px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--border2)', color: 'var(--text3)', background: 'var(--bg)' }}>
-                  {b.bank_name ?? 'No bank'}: {formatAmount(b.total)}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Footer actions */}
-          <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex gap-2">
-              <button
-                onClick={e => { e.stopPropagation(); setShowAddContrib(true) }}
-                className="flex items-center gap-1 text-[12px] font-medium px-2.5 py-1 rounded-md"
-                style={{ background: 'var(--gl)', color: 'var(--green)', border: '0.5px solid var(--green)' }}
-              >
-                <PlusIcon className="w-3 h-3" /> Add
-              </button>
-              <button
-                onClick={e => { e.stopPropagation(); onEdit() }}
-                className="text-[12px] px-2.5 py-1 rounded-md border"
-                style={{ borderColor: 'var(--border2)', color: 'var(--text3)', background: 'var(--surface)' }}
-              >
-                Edit
-              </button>
-              <button
-                onClick={e => { e.stopPropagation(); onArchive() }}
-                className="text-[12px] px-2.5 py-1 rounded-md"
-                style={{ background: 'var(--al)', color: 'var(--amber)', border: '0.5px solid var(--amber)' }}
-              >
-                Archive
-              </button>
-            </div>
-            <button
-              onClick={handleExpand}
-              className="flex items-center gap-1 text-[11px]"
-              style={{ color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              History {expanded ? <ChevronUpIcon className="w-3 h-3" /> : <ChevronDownIcon className="w-3 h-3" />}
-            </button>
-          </div>
+      <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.35)' }} onClick={onClose} />
+      <div
+        className="fixed top-0 right-0 h-full z-40 flex flex-col overflow-hidden shadow-2xl"
+        style={{ width: 'min(420px, 100vw)', background: 'var(--surface)' }}
+      >
+        <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ background: color }}>
+          <h2 className="text-[17px] font-semibold" style={{ color: 'white' }}>{jar.name}</h2>
+          <button onClick={onClose}
+            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', borderRadius: '6px', padding: '4px' }}>
+            <XMarkIcon className="w-4 h-4" style={{ color: 'white' }} />
+          </button>
         </div>
 
-        {expanded && (
-          <div className="border-t px-4 pb-4 pt-3" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
-            {contribLoading ? (
-              <p className="text-[12px] py-3 text-center" style={{ color: 'var(--text4)' }}>Loading…</p>
-            ) : contributions.length === 0 ? (
-              <p className="text-[12px] py-3 text-center" style={{ color: 'var(--text4)' }}>No contributions yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {contributions.map(c => (
-                  <div key={c.id} className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[13px] font-medium" style={{ color: parseFloat(c.amount) < 0 ? 'var(--amber)' : 'var(--green)' }}>
-                        {parseFloat(c.amount) > 0 ? '+' : ''}{formatAmount(c.amount)}
-                      </span>
-                      {c.bank_name && (
-                        <span className="ml-1.5 text-[11px]" style={{ color: 'var(--text3)' }}>{c.bank_name}</span>
-                      )}
-                      {c.notes && (
-                        <span className="ml-1.5 text-[11px]" style={{ color: 'var(--text4)' }}>· {c.notes}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px]" style={{ color: 'var(--text4)' }}>{formatDate(c.date)}</span>
-                      <button
-                        onClick={() => handleDeleteContribution(c.id)}
-                        className="p-1 rounded"
-                        style={{ color: 'var(--text4)', background: 'none', border: 'none', cursor: 'pointer' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text4)')}
-                      >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-5 py-5 border-b" style={{ borderColor: 'var(--border)' }}>
+            {jar.description && (
+              <p className="text-[13px] mb-4" style={{ color: 'var(--text3)' }}>{jar.description}</p>
+            )}
+            <div className="flex items-end justify-between mb-1">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide mb-0.5" style={{ color: 'var(--text4)' }}>Balance</p>
+                <p className="text-[26px] font-bold leading-none" style={{ color }}>{formatAmount(jar.balance)}</p>
+              </div>
+              {target && (
+                <div className="text-right">
+                  <p className="text-[11px]" style={{ color: 'var(--text3)' }}>Target</p>
+                  <p className="text-[14px] font-medium" style={{ color: 'var(--text2)' }}>{formatAmount(jar.target_amount!)}</p>
+                </div>
+              )}
+            </div>
+            {target && (
+              <div className="mt-3">
+                <div className="flex justify-between text-[11px] mb-1" style={{ color: 'var(--text4)' }}>
+                  <span>{pct.toFixed(0)}% of goal</span>
+                  <span>{formatAmount(String(Math.max(0, target - balance)))} remaining</span>
+                </div>
+                <div className="h-2 rounded-full" style={{ background: 'var(--border)' }}>
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+                </div>
               </div>
             )}
           </div>
-        )}
+
+          {jar.bank_breakdown.length > 0 && (
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+              <p className="text-[11px] uppercase tracking-wide mb-3" style={{ color: 'var(--text4)' }}>By bank</p>
+              <div className="space-y-2">
+                {jar.bank_breakdown.map((b, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <span className="text-[13px]" style={{ color: 'var(--text2)' }}>{b.bank_name ?? 'No bank'}</span>
+                    <span className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{formatAmount(b.total)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setContribModal('add')}
+                className="flex-1 py-2.5 rounded-lg text-[13px] font-medium text-white"
+                style={{ background: 'var(--green)' }}>
+                Add funds
+              </button>
+              <button
+                onClick={() => setContribModal('withdraw')}
+                className="flex-1 py-2.5 rounded-lg text-[13px] font-medium border"
+                style={{ borderColor: 'var(--amber)', color: 'var(--amber)', background: 'var(--al)' }}>
+                Withdraw
+              </button>
+            </div>
+          </div>
+
+          <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+            <p className="text-[11px] uppercase tracking-wide mb-3" style={{ color: 'var(--text4)' }}>History</p>
+            {contribLoading ? (
+              <p className="text-[12px] py-4 text-center" style={{ color: 'var(--text4)' }}>Loading…</p>
+            ) : contributions.length === 0 ? (
+              <p className="text-[12px] py-4 text-center" style={{ color: 'var(--text4)' }}>No contributions yet.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {contributions.map(c => {
+                  const isPositive = parseFloat(c.amount) >= 0
+                  return (
+                    <div key={c.id} className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <span className="flex-shrink-0 mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                          style={{
+                            background: isPositive ? 'var(--gl)' : 'var(--al)',
+                            color: isPositive ? 'var(--green)' : 'var(--amber)',
+                          }}>
+                          {isPositive ? 'Added' : 'Withdrawn'}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium" style={{ color: isPositive ? 'var(--green)' : 'var(--amber)' }}>
+                            {isPositive ? '+' : ''}{formatAmount(c.amount)}
+                          </p>
+                          <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                            {c.bank_name && <span className="text-[11px]" style={{ color: 'var(--text3)' }}>{c.bank_name}</span>}
+                            {c.notes && <span className="text-[11px]" style={{ color: 'var(--text4)' }}>· {c.notes}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[11px]" style={{ color: 'var(--text4)' }}>{formatDate(c.date)}</span>
+                        <button onClick={() => handleDeleteContribution(c.id)}
+                          className="p-1 rounded"
+                          style={{ color: 'var(--text4)', background: 'none', border: 'none', cursor: 'pointer' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text4)')}>
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 py-4 flex gap-4">
+            <button onClick={onEdit}
+              className="text-[13px]"
+              style={{ color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              Edit jar
+            </button>
+            <button onClick={onArchive}
+              className="text-[13px]"
+              style={{ color: 'var(--amber)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              Archive jar
+            </button>
+          </div>
+        </div>
       </div>
 
-      {showAddContrib && (
+      {contribModal && (
         <ContributionModal
           jarName={jar.name}
+          type={contribModal}
           banks={banks}
-          onClose={() => setShowAddContrib(false)}
+          onClose={() => setContribModal(null)}
           onSave={handleAddContribution}
         />
       )}
@@ -392,13 +415,56 @@ function JarCard({
   )
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────────
+function JarCard({ jar, onClick }: { jar: Jar; onClick: () => void }) {
+  const color = jar.color || '#22c55e'
+  const balance = parseFloat(jar.balance)
+  const target = jar.target_amount ? parseFloat(jar.target_amount) : null
+  const pct = target ? Math.min((balance / target) * 100, 100) : 0
+  const contribCount = (jar as Jar & { contribution_count?: number }).contribution_count ?? null
+
+  return (
+    <div
+      onClick={onClick}
+      className="rounded-xl border overflow-hidden transition-shadow duration-150"
+      style={{ background: 'var(--surface)', borderColor: 'var(--border)', cursor: 'pointer' }}
+      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)')}
+      onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+    >
+      <div className="flex items-end px-4 pb-3" style={{ background: color, height: '52px' }}>
+        <h4 className="text-[15px] font-semibold" style={{ color: 'white' }}>{jar.name}</h4>
+      </div>
+
+      <div className="px-4 pt-3 pb-4">
+        <p className="text-[22px] font-bold leading-none mb-1" style={{ color }}>{formatAmount(jar.balance)}</p>
+        {target && (
+          <p className="text-[11px] mb-2.5" style={{ color: 'var(--text3)' }}>
+            of {formatAmount(jar.target_amount!)} · {pct.toFixed(0)}%
+          </p>
+        )}
+        {!target && jar.description && (
+          <p className="text-[11px] mb-2.5 truncate" style={{ color: 'var(--text3)' }}>{jar.description}</p>
+        )}
+        {target && (
+          <div className="h-1.5 rounded-full mb-3" style={{ background: 'var(--border)' }}>
+            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, background: color }} />
+          </div>
+        )}
+        {contribCount !== null && (
+          <p className="text-[11px]" style={{ color: 'var(--text4)' }}>
+            {contribCount} contribution{contribCount !== 1 ? 's' : ''}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function JarsPage() {
   const [jars, setJars] = useState<Jar[]>([])
   const [banks, setBanks] = useState<Bank[]>([])
   const [loading, setLoading] = useState(false)
   const [modalJar, setModalJar] = useState<Jar | 'new' | null>(null)
+  const [drawerJar, setDrawerJar] = useState<Jar | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<Jar | null>(null)
 
   const fetchJars = useCallback(async () => {
@@ -429,7 +495,18 @@ export default function JarsPage() {
   async function handleArchive(jar: Jar) {
     await jarsApi.archive(jar.id)
     setConfirmArchive(null)
+    setDrawerJar(null)
     fetchJars()
+  }
+
+  function openEdit(jar: Jar) {
+    setDrawerJar(null)
+    setModalJar(jar)
+  }
+
+  function openArchiveConfirm(jar: Jar) {
+    setDrawerJar(null)
+    setConfirmArchive(jar)
   }
 
   const totalSaved = jars.reduce((sum, j) => sum + parseFloat(j.balance), 0)
@@ -444,51 +521,46 @@ export default function JarsPage() {
             {jars.length > 0 && ` · ${formatAmount(totalSaved)} total saved`}
           </p>
         </div>
-        <button
-          onClick={() => setModalJar('new')}
+        <button onClick={() => setModalJar('new')}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] text-white flex-shrink-0"
-          style={{ background: 'var(--green)' }}
-        >
+          style={{ background: 'var(--green)' }}>
           <PlusIcon className="w-4 h-4" /> New jar
         </button>
       </div>
 
       {loading ? (
         <div className="grid md:grid-cols-2 gap-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-32 rounded-xl animate-pulse" style={{ background: 'var(--border)' }} />)}
+          {[1, 2, 3].map(i => <div key={i} className="h-36 rounded-xl animate-pulse" style={{ background: 'var(--border)' }} />)}
         </div>
       ) : jars.length === 0 ? (
         <div className="py-16 text-center rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
           <p className="text-[13px] mb-2" style={{ color: 'var(--text3)' }}>No jars yet.</p>
-          <button
-            onClick={() => setModalJar('new')}
-            className="text-[13px] font-medium"
-            style={{ color: 'var(--green)', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
+          <button onClick={() => setModalJar('new')} className="text-[13px] font-medium"
+            style={{ color: 'var(--green)', background: 'none', border: 'none', cursor: 'pointer' }}>
             Create your first jar →
           </button>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-3">
           {jars.map(jar => (
-            <JarCard
-              key={jar.id}
-              jar={jar}
-              banks={banks}
-              onEdit={() => setModalJar(jar)}
-              onArchive={() => setConfirmArchive(jar)}
-              onContributionAdded={fetchJars}
-            />
+            <JarCard key={jar.id} jar={jar} onClick={() => setDrawerJar(jar)} />
           ))}
         </div>
       )}
 
-      {modalJar !== null && (
-        <JarModal
-          jar={modalJar === 'new' ? null : modalJar}
-          onClose={() => setModalJar(null)}
-          onSave={handleSave}
+      {drawerJar && (
+        <JarDrawer
+          jar={drawerJar}
+          banks={banks}
+          onClose={() => setDrawerJar(null)}
+          onEdit={() => openEdit(drawerJar)}
+          onArchive={() => openArchiveConfirm(drawerJar)}
+          onContributionAdded={fetchJars}
         />
+      )}
+
+      {modalJar !== null && (
+        <JarModal jar={modalJar === 'new' ? null : modalJar} onClose={() => setModalJar(null)} onSave={handleSave} />
       )}
 
       {confirmArchive && (
@@ -503,8 +575,8 @@ export default function JarsPage() {
                 style={{ borderColor: 'var(--border2)', color: 'var(--text2)', background: 'var(--surface)' }}>
                 Cancel
               </button>
-              <button onClick={() => handleArchive(confirmArchive)} className="flex-1 py-2 rounded-md text-[13px] text-white"
-                style={{ background: 'var(--amber)' }}>
+              <button onClick={() => handleArchive(confirmArchive)} className="flex-1 py-2 rounded-md text-[13px]"
+                style={{ background: 'var(--amber)', color: '#1a1a1a' }}>
                 Archive
               </button>
             </div>
