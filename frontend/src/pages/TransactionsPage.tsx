@@ -97,7 +97,7 @@ function TransactionForm({
   )
 
   return (
-    <div className="fixed inset-0 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto" style={{ background: 'rgba(0,0,0,0.4)' }}>
+    <div className="fixed inset-0 flex items-start sm:items-center justify-center z-[9999] p-4 overflow-y-auto" style={{ background: 'rgba(0,0,0,0.4)' }}>
       <div className="rounded-xl border p-4 sm:p-6 w-[480px] max-w-full my-auto" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-[16px] font-medium" style={{ color: 'var(--text)' }}>{initial ? 'Edit transaction' : 'Add transaction'}</h3>

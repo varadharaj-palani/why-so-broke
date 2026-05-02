@@ -42,7 +42,7 @@ function ConfirmModal({
   onConfirm: () => void
 }) {
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[70]" style={{ background: 'rgba(0,0,0,0.45)' }}>
+    <div className="fixed inset-0 flex items-center justify-center z-[9999]" style={{ background: 'rgba(0,0,0,0.45)' }}>
       <div className="rounded-xl border p-6 w-[360px] max-w-[94vw]" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <h3 className="text-[15px] font-medium mb-2" style={{ color: 'var(--text)' }}>{title}</h3>
         <p className="text-[13px] mb-5" style={{ color: 'var(--text3)' }}>{body}</p>
@@ -102,7 +102,7 @@ function ContributionModal({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[60]" style={{ background: 'rgba(0,0,0,0.4)' }}
+    <div className="fixed inset-0 flex items-center justify-center z-[9999]" style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="rounded-xl border p-6 w-[380px] max-w-[94vw] space-y-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between">
@@ -175,6 +175,8 @@ function EditJarModal({
   const [error, setError] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 })
 
   const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
   const fiStyle = { background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }
@@ -199,7 +201,7 @@ function EditJarModal({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.4)' }}
+    <div className="fixed inset-0 flex items-center justify-center z-[9999]" style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="rounded-xl border p-6 w-[420px] max-w-[94vw] space-y-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between">
@@ -210,8 +212,46 @@ function EditJarModal({
         </div>
         <div>
           <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>Name</label>
-          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-            className={fi} style={fiStyle} />
+          <div className="flex items-center gap-2">
+            <button
+              ref={buttonRef}
+              onClick={() => {
+                if (!showPicker && buttonRef.current) {
+                  const r = buttonRef.current.getBoundingClientRect()
+                  const pickerH = 400
+                  const pickerW = 352
+                  const top = r.top > pickerH + 8 ? r.top - pickerH - 8 : r.bottom + 8
+                  const left = Math.min(r.left, window.innerWidth - pickerW - 8)
+                  setPickerPos({ top, left })
+                }
+                setShowPicker(p => !p)
+              }}
+              className="flex-shrink-0 w-[38px] h-[38px] rounded-md border text-[22px] flex items-center justify-center transition-all hover:border-[var(--green)]"
+              style={{ borderColor: showPicker ? 'var(--green)' : 'var(--border2)', background: 'var(--surface)' }}
+              title="Pick emoji"
+            >
+              {form.emoji || '🫙'}
+            </button>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+              className={fi} style={fiStyle} />
+          </div>
+          {showPicker && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setShowPicker(false)} />
+              <div ref={pickerRef} style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: 9999 }}>
+                <Picker
+                  data={data}
+                  theme="light"
+                  set="native"
+                  previewPosition="none"
+                  onEmojiSelect={(em: { native: string }) => {
+                    setForm({ ...form, emoji: em.native })
+                    setShowPicker(false)
+                  }}
+                />
+              </div>
+            </>
+          )}
         </div>
         <div>
           <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>Description (optional)</label>
@@ -232,43 +272,6 @@ function EditJarModal({
                 className="w-6 h-6 rounded-full border-2 transition-all"
                 style={{ background: c, borderColor: form.color === c ? 'var(--text)' : 'transparent' }} />
             ))}
-          </div>
-        </div>
-        <div>
-          <label className="block text-[12px] font-medium mb-2" style={{ color: 'var(--text2)' }}>Icon (optional)</label>
-          <div className="flex items-center gap-2 relative">
-            <button onClick={() => setForm({ ...form, emoji: '' })}
-              className="w-8 h-8 rounded-md border text-[13px] transition-all flex items-center justify-center"
-              style={{ borderColor: form.emoji === '' ? 'var(--text)' : 'var(--border2)', background: form.emoji === '' ? 'var(--border)' : 'var(--surface)', color: 'var(--text4)' }}
-              title="No icon">✕</button>
-            <button
-              onClick={() => setShowPicker(p => !p)}
-              className="w-9 h-9 rounded-md border text-[22px] flex items-center justify-center transition-all"
-              style={{
-                borderColor: showPicker ? 'var(--green)' : 'var(--border2)',
-                background: 'var(--surface)',
-              }}
-              title="Pick emoji"
-            >
-              {form.emoji || '😀'}
-            </button>
-            {form.emoji && (
-              <span className="text-[12px]" style={{ color: 'var(--text3)' }}>{form.emoji}</span>
-            )}
-            {showPicker && (
-              <div ref={pickerRef} className="absolute top-10 left-0 z-50" style={{ overflow: 'visible' }}>
-                <Picker
-                  data={data}
-                  theme="light"
-                  set="native"
-                  onEmojiSelect={(em: { native: string }) => {
-                    setForm({ ...form, emoji: em.native })
-                    setShowPicker(false)
-                  }}
-                  onClickOutside={() => setShowPicker(false)}
-                />
-              </div>
-            )}
           </div>
         </div>
         {error && <p className="text-[12px] text-red-500">{error}</p>}
