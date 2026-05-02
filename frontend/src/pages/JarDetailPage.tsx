@@ -175,6 +175,8 @@ function EditJarModal({
   const [error, setError] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 })
 
   const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
   const fiStyle = { background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }
@@ -242,7 +244,14 @@ function EditJarModal({
               style={{ borderColor: form.emoji === '' ? 'var(--text)' : 'var(--border2)', background: form.emoji === '' ? 'var(--border)' : 'var(--surface)', color: 'var(--text4)' }}
               title="No icon">✕</button>
             <button
-              onClick={() => setShowPicker(p => !p)}
+              ref={buttonRef}
+              onClick={() => {
+                if (!showPicker && buttonRef.current) {
+                  const r = buttonRef.current.getBoundingClientRect()
+                  setPickerPos({ top: r.bottom + 8, left: r.left })
+                }
+                setShowPicker(p => !p)
+              }}
               className="w-9 h-9 rounded-md border text-[22px] flex items-center justify-center transition-all"
               style={{
                 borderColor: showPicker ? 'var(--green)' : 'var(--border2)',
@@ -256,7 +265,7 @@ function EditJarModal({
               <span className="text-[12px]" style={{ color: 'var(--text3)' }}>{form.emoji}</span>
             )}
             {showPicker && (
-              <div ref={pickerRef} className="absolute top-10 left-0 z-50" style={{ overflow: 'visible' }}>
+              <div ref={pickerRef} style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: 9999 }}>
                 <Picker
                   data={data}
                   theme="light"
