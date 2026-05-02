@@ -59,7 +59,7 @@ function JarModal({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.4)' }}
+    <div className="fixed inset-0 flex items-center justify-center z-[9999]" style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="rounded-xl border p-6 w-[420px] max-w-[94vw] space-y-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between">
@@ -122,7 +122,11 @@ function JarModal({
               onClick={() => {
                 if (!showPicker && buttonRef.current) {
                   const r = buttonRef.current.getBoundingClientRect()
-                  setPickerPos({ top: r.bottom + 8, left: r.left })
+                  const pickerH = 435
+                  const pickerW = 352
+                  const top = r.top > pickerH + 8 ? r.top - pickerH - 8 : r.bottom + 8
+                  const left = Math.min(r.left, window.innerWidth - pickerW - 8)
+                  setPickerPos({ top, left })
                 }
                 setShowPicker(p => !p)
               }}
@@ -400,7 +404,7 @@ export default function JarsPage() {
       )}
 
       {confirmArchive && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.4)' }}>
+        <div className="fixed inset-0 flex items-center justify-center z-[9999]" style={{ background: 'rgba(0,0,0,0.4)' }}>
           <div className="rounded-xl border p-6 w-[360px] max-w-[94vw]" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
             <h3 className="text-[15px] font-medium mb-2" style={{ color: 'var(--text)' }}>Archive jar?</h3>
             <p className="text-[13px] mb-5" style={{ color: 'var(--text3)' }}>

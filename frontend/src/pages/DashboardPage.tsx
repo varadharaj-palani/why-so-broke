@@ -527,7 +527,7 @@ function BankBalanceCard({ balance: b }: { balance: BankBalance }) {
       {/* Modal */}
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
           style={{ background: 'rgba(0,0,0,0.5)' }}
           onClick={() => setOpen(false)}
         >

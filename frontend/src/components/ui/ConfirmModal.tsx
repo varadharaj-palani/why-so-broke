@@ -22,7 +22,7 @@ export default function ConfirmModal({
   const descId = useId()
 
   return (
-    <Dialog open={open} onClose={onCancel} className="relative z-50">
+    <Dialog open={open} onClose={onCancel} className="relative z-[9999]">
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
 
