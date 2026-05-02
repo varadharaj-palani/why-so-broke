@@ -73,7 +73,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
      *   Mobile  — natural page scroll; header sticky top; bottom nav fixed bottom
      *   Desktop — h-screen locked layout; sidebar + main content scroll internally
      */
-    <div className="flex flex-col min-h-dvh md:h-screen md:overflow-hidden overflow-x-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+    <div className="flex flex-col min-h-dvh md:h-screen md:overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
 
       {/* Topbar — sticky on mobile, static on desktop */}
       <header

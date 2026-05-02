@@ -111,8 +111,8 @@ export default function DashboardPage() {
           <h2 className="text-[20px] font-medium" style={{ color: 'var(--text)' }}>Dashboard</h2>
           <p className="text-[12px] mt-0.5" style={{ color: 'var(--text3)' }}>Your financial overview</p>
         </div>
-        <div className="flex gap-2 self-start">
-          <div className="flex gap-1 p-1 rounded-full border" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+        <div className="flex gap-2 self-start min-w-0 overflow-x-auto">
+          <div className="flex gap-1 p-1 rounded-full border flex-shrink-0" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
             {RANGES.map(r => (
               <button
                 key={r.key}
