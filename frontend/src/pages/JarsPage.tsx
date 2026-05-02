@@ -139,18 +139,20 @@ function JarModal({
               <span className="text-[12px]" style={{ color: 'var(--text3)' }}>{form.emoji}</span>
             )}
             {showPicker && (
-              <div ref={pickerRef} style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: 9999 }}>
-                <Picker
-                  data={data}
-                  theme="light"
-                  set="native"
-                  onEmojiSelect={(em: { native: string }) => {
-                    setForm({ ...form, emoji: em.native })
-                    setShowPicker(false)
-                  }}
-                  onClickOutside={() => setShowPicker(false)}
-                />
-              </div>
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setShowPicker(false)} />
+                <div ref={pickerRef} style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: 9999 }}>
+                  <Picker
+                    data={data}
+                    theme="light"
+                    set="native"
+                    onEmojiSelect={(em: { native: string }) => {
+                      setForm({ ...form, emoji: em.native })
+                      setShowPicker(false)
+                    }}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
