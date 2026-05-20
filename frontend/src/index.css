@@ -42,3 +42,9 @@
     color: var(--text);
   }
 }
+
+@layer utilities {
+  .pb-safe-nav {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}

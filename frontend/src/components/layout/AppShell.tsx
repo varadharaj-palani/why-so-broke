@@ -73,7 +73,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
      *   Mobile  — natural page scroll; header sticky top; bottom nav fixed bottom
      *   Desktop — h-screen locked layout; sidebar + main content scroll internally
      */
-    <div className="flex flex-col min-h-screen md:h-screen md:overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+    <div className="flex flex-col min-h-dvh md:h-screen md:overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
 
       {/* Topbar — sticky on mobile, static on desktop */}
       <header
@@ -139,7 +139,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Main content
             Mobile : pb-20 so content clears the fixed bottom nav
             Desktop: overflow-y-auto for internal scroll */}
-        <main className="flex-1 md:overflow-y-auto pb-20 md:pb-0">
+        <main className="flex-1 md:overflow-y-auto pb-safe-nav md:pb-0">
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full">
             {children}
           </div>
@@ -149,7 +149,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Bottom nav — mobile only, fixed so it never scrolls away */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex border-t"
-        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+        style={{ background: 'var(--surface)', borderColor: 'var(--border)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {mobileNav.map(({ to, label, icon: Icon, badge: itemBadge }) => (
           <NavLink

@@ -383,7 +383,7 @@ export default function TransactionsPage() {
           placeholder="Search transactions…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="flex-1 min-w-[160px] px-3 py-1.5 rounded-md border text-[13px] outline-none transition-colors focus:border-[var(--green)]"
+          className="flex-1 min-w-0 px-3 py-1.5 rounded-md border text-[13px] outline-none transition-colors focus:border-[var(--green)]"
           style={{ background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }}
         />
         <div className="flex items-center gap-1">

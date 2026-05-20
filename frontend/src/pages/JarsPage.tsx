@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { jarsApi } from '../api/jars'
 import { banksApi } from '../api/banks'
 import { Jar } from '../types'
 import { formatAmount } from '../utils/formatters'
 import { PlusIcon, XMarkIcon, PencilIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline'
-import Picker from '@emoji-mart/react'
-import data from '@emoji-mart/data'
+import EmojiPickerButton from '../components/ui/EmojiPickerButton'
 
 const JAR_COLORS = [
   '#22c55e', '#3b82f6', '#f59e0b', '#ef4444',
@@ -31,10 +30,6 @@ function JarModal({
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [showPicker, setShowPicker] = useState(false)
-  const pickerRef = useRef<HTMLDivElement>(null)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 })
 
   const fi = "w-full border rounded-md px-3 py-2 text-[13px] outline-none focus:border-[var(--green)] transition-colors"
   const fiStyle = { background: 'var(--surface)', borderColor: 'var(--border2)', color: 'var(--text)' }
@@ -72,45 +67,10 @@ function JarModal({
         <div>
           <label className="block text-[12px] font-medium mb-1" style={{ color: 'var(--text2)' }}>Name</label>
           <div className="flex items-center gap-2">
-            <button
-              ref={buttonRef}
-              onClick={() => {
-                if (!showPicker && buttonRef.current) {
-                  const r = buttonRef.current.getBoundingClientRect()
-                  const pickerH = 400
-                  const pickerW = 352
-                  const top = r.top > pickerH + 8 ? r.top - pickerH - 8 : r.bottom + 8
-                  const left = Math.min(r.left, window.innerWidth - pickerW - 8)
-                  setPickerPos({ top, left })
-                }
-                setShowPicker(p => !p)
-              }}
-              className="flex-shrink-0 w-[38px] h-[38px] rounded-md border text-[22px] flex items-center justify-center transition-all hover:border-[var(--green)]"
-              style={{ borderColor: showPicker ? 'var(--green)' : 'var(--border2)', background: 'var(--surface)' }}
-              title="Pick emoji"
-            >
-              {form.emoji || '🫙'}
-            </button>
+            <EmojiPickerButton emoji={form.emoji} onSelect={emoji => setForm({ ...form, emoji })} />
             <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
               className={fi} style={fiStyle} placeholder="e.g. Emergency Fund" />
           </div>
-          {showPicker && (
-            <>
-              <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setShowPicker(false)} />
-              <div ref={pickerRef} style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: 9999 }}>
-                <Picker
-                  data={data}
-                  theme="light"
-                  set="native"
-                  previewPosition="none"
-                  onEmojiSelect={(em: { native: string }) => {
-                    setForm({ ...form, emoji: em.native })
-                    setShowPicker(false)
-                  }}
-                />
-              </div>
-            </>
-          )}
         </div>
 
         <div>
